@@ -1,0 +1,138 @@
+import React, { useEffect, useState } from 'react';
+import { api } from '../api.js';
+
+const STATUS_ICON = { added: '✅', substituted: '🔁', needs_review: '⚠️', unavailable: '🚫', error: '❌' };
+
+export default function CartView() {
+  const [runs, setRuns] = useState([]);
+  const [run, setRun] = useState(null);
+  const [manual, setManual] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const loadRuns = () => api.get('/cart/runs').then(setRuns).catch(e => setErr(e.message));
+  useEffect(() => { loadRuns(); }, []);
+
+  // poll while a run is in progress
+  useEffect(() => {
+    if (!runs.some(r => r.status === 'running')) return;
+    const t = setInterval(loadRuns, 4000);
+    return () => clearInterval(t);
+  }, [runs]);
+
+  async function build() {
+    setBusy(true); setErr(null);
+    try {
+      await api.post('/cart/build', {});
+      await loadRuns();
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  }
+
+  async function openRun(id) {
+    setRun(await api.get(`/cart/runs/${id}`));
+  }
+
+  async function complete(id) {
+    const res = await api.post(`/cart/runs/${id}/complete`, {});
+    alert(`${res.purchased} items marked purchased and added to history. Now check out in the Sixty60 app 🛵`);
+    setRun(null); loadRuns();
+  }
+
+  async function showManual() {
+    setManual(await api.get('/cart/manual'));
+  }
+
+  const summary = r => {
+    const s = typeof r.summary === 'string' ? JSON.parse(r.summary) : (r.summary || {});
+    return s;
+  };
+
+  return (
+    <div>
+      <div className="card">
+        <h2>Sixty60 cart builder</h2>
+        <p className="muted">
+          Fills your Checkers cart from the pending list: known products are added directly (tier 1),
+          new items are searched and AI-matched (tier 2), anything uncertain is flagged for you (tier 3).
+          <b> It never checks out — you always approve and pay.</b>
+        </p>
+        <div className="row">
+          <button className="primary" disabled={busy} onClick={build}>🤖 Build cart now</button>
+          <button className="ghost" onClick={showManual}>📋 Manual mode (tap-through links)</button>
+        </div>
+        {err && <div className="error-box">{err}</div>}
+        <p className="muted" style={{ marginTop: 8 }}>
+          First time? Run <code>npm run sixty60:login</code> in <code>grocery-os/server</code> to save your Checkers session.
+        </p>
+      </div>
+
+      {manual && (
+        <div className="card">
+          <h2>Manual mode — {manual.length} items</h2>
+          <p className="muted">Each link opens a Checkers search. Tap, add, next. Unbreakable fallback.</p>
+          <ul className="items">
+            {manual.map(m => (
+              <li key={m.id}>
+                <span className="name">{m.name}</span>
+                <span className="qty">{Number(m.quantity)}{m.unit ? ` ${m.unit}` : '×'}</span>
+                <a href={m.link} target="_blank" rel="noreferrer">Open search ↗</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="card">
+        <h2>Runs</h2>
+        {!runs.length && <p className="muted">No cart runs yet.</p>}
+        <table className="plain">
+          <thead><tr><th>#</th><th>Started</th><th>Status</th><th>Added</th><th>Review</th><th>Est. total</th><th></th></tr></thead>
+          <tbody>
+            {runs.map(r => {
+              const s = summary(r);
+              return (
+                <tr key={r.id}>
+                  <td>{r.id}</td>
+                  <td>{new Date(r.started_at).toLocaleString('en-ZA')}</td>
+                  <td>{r.status === 'running' ? '⏳ running' : r.status}</td>
+                  <td>{s.added ?? '—'}</td>
+                  <td>{s.needs_review ?? '—'}</td>
+                  <td>{s.est_total_cents ? `R${(s.est_total_cents / 100).toFixed(2)}` : '—'}</td>
+                  <td><button className="ghost tiny" onClick={() => openRun(r.id)}>Details</button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {run && (
+        <div className="card">
+          <div className="row">
+            <h2>Run #{run.id} — review</h2>
+            <div className="spacer" />
+            {run.status === 'done' && (
+              <button className="primary" onClick={() => complete(run.id)}>✅ I checked out — mark purchased</button>
+            )}
+          </div>
+          <table className="plain">
+            <thead><tr><th></th><th>Item</th><th>Product</th><th>Tier</th><th>Price</th><th>Note</th></tr></thead>
+            <tbody>
+              {run.items.map(it => (
+                <tr key={it.id}>
+                  <td>{STATUS_ICON[it.status] || it.status}</td>
+                  <td>{it.item_name}</td>
+                  <td>{it.product_url ? <a href={it.product_url} target="_blank" rel="noreferrer">{it.product_name || 'open ↗'}</a> : (it.product_name || '—')}</td>
+                  <td>{it.tier}</td>
+                  <td>{it.price_cents ? `R${(it.price_cents / 100).toFixed(2)}` : '—'}</td>
+                  <td className="muted">{it.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

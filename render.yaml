@@ -1,0 +1,28 @@
+# Render Blueprint — deploys the Grocery OS API as a free web service.
+# Render reads this automatically when you create a Blueprint from the repo.
+services:
+  - type: web
+    name: grocery-os-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      # Secrets — Render prompts for these when you launch the blueprint.
+      - key: DATABASE_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: NODE_VERSION
+        value: "20"

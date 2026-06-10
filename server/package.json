@@ -1,0 +1,26 @@
+{
+  "name": "grocery-os-server",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Strauss Grocery OS API: meal planning, WhatsApp intake, Sixty60 cart worker",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "migrate": "node src/db/migrate.js",
+    "sixty60:login": "node src/worker/sixty60Login.js",
+    "cart:build": "node src/worker/cartBuilder.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.74.0",
+    "@electric-sql/pglite": "^0.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "playwright-core": "^1.49.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
