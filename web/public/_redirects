@@ -1,0 +1,4 @@
+# Proxy API calls to the Render backend (keeps the app's relative /api fetches working).
+/api/*  https://grocery-os-api.onrender.com/api/:splat  200
+# SPA fallback — serve the app shell for any other path.
+/*      /index.html                                     200

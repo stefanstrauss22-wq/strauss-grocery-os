@@ -8,7 +8,7 @@ import { query } from '../db/db.js';
 import { matchCatalog, saveMapping, searchLink } from '../services/catalogMatch.js';
 import { claude, firstText, aiEnabled } from '../services/claude.js';
 import { config } from '../config.js';
-import { selectors } from './selectors.js';
+import { selectors, parsePriceCents, nameFromTileText, externalIdFromHref } from './selectors.js';
 import { launchBrowser, STATE_PATH } from './sixty60Login.js';
 
 const PICK_SCHEMA = {
@@ -37,23 +37,31 @@ async function aiPickProduct(itemName, quantity, unit, candidates) {
   return pick_index === null ? null : candidates[pick_index] || null;
 }
 
-function parsePriceCents(text) {
-  const m = String(text || '').replace(/\s/g, '').match(/R?(\d+)[.,](\d{2})/);
-  return m ? Number(m[1]) * 100 + Number(m[2]) : null;
-}
-
-async function scrapeSearchResults(page, itemName, limit = 6) {
+async function scrapeSearchResults(page, itemName, limit = 8) {
   await page.goto(selectors.searchUrl(itemName), { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.waitForTimeout(2500); // let client-side rendering settle
+  // SPA renders results client-side — wait for real tiles, not a fixed pause.
+  await page.waitForSelector(selectors.productTile, { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(1500);
   const tiles = page.locator(selectors.productTile);
   const count = Math.min(await tiles.count(), limit);
   const candidates = [];
   for (let i = 0; i < count; i++) {
     const tile = tiles.nth(i);
-    const name = (await tile.locator(selectors.productName).first().textContent().catch(() => null))?.trim();
-    const price = (await tile.locator(selectors.productPrice).first().textContent().catch(() => null))?.trim();
+    const text = (await tile.innerText().catch(() => '')) || '';
     const href = await tile.locator(selectors.productLink).first().getAttribute('href').catch(() => null);
-    if (name) candidates.push({ index: i, name, price, url: href ? new URL(href, 'https://www.checkers.co.za').href : null, tile });
+    const name = nameFromTileText(text, href);
+    if (!name) continue;
+    const sponsored = /sponsored/i.test(text) || /sponsored=true/.test(href || '');
+    const priceCents = parsePriceCents(text);
+    candidates.push({
+      index: i,
+      name: sponsored ? `${name} (sponsored)` : name,
+      price: priceCents !== null ? `R${(priceCents / 100).toFixed(2)}` : null,
+      priceCents,
+      url: href ? new URL(href, 'https://www.checkers.co.za').href : null,
+      externalId: externalIdFromHref(href),
+      tile,
+    });
   }
   return candidates;
 }
@@ -79,7 +87,10 @@ export async function buildCart(runId) {
     throw new Error('No Sixty60 session found. Run: npm run sixty60:login');
   }
   const items = (await query(`SELECT * FROM shopping_items WHERE status = 'pending' ORDER BY category, name`)).rows;
-  const browser = await launchBrowser({ headless: true });
+  // Visible browser by default: the Sixty60 site's bot protection is kinder to
+  // headed browsers, and watching the robot shop is half the fun. Set
+  // CART_HEADLESS=1 to hide it once everything is proven stable.
+  const browser = await launchBrowser({ headless: process.env.CART_HEADLESS === '1' });
   const context = await browser.newContext({ storageState: STATE_PATH });
   const page = await context.newPage();
   const counts = { added: 0, needs_review: 0, error: 0, tier1: 0, tier2: 0 };
@@ -115,10 +126,10 @@ export async function buildCart(runId) {
         if (picked) {
           try {
             await addToCart(picked.tile);
-            const priceCents = parsePriceCents(picked.price);
+            const priceCents = picked.priceCents ?? null;
             counts.added++; counts.tier2++;
             totalCents += priceCents || 0;
-            await saveMapping({ itemName: item.name, productName: picked.name, productUrl: picked.url, priceCents, confidence: 'suggested' });
+            await saveMapping({ itemName: item.name, productName: picked.name, productUrl: picked.url, externalProductId: picked.externalId, priceCents, confidence: 'suggested' });
             await recordResult(runId, item, { tier: 2, status: 'added', productName: picked.name, productUrl: picked.url, priceCents });
             continue;
           } catch (err) {

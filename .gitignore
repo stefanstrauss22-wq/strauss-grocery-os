@@ -4,3 +4,6 @@ dist/
 server/data/
 *.local
 sixty60-state.json
+
+# Local Netlify folder
+.netlify
