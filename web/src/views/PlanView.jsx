@@ -24,6 +24,13 @@ export default function PlanView() {
   const loadPlan = ws => api.get(`/plan/${ws}`).then(setPlan).catch(() => setPlan(null));
   useEffect(() => { loadPlan(weekStart); }, [weekStart]);
 
+  // Start the budget slider from the household profile's default budget.
+  useEffect(() => {
+    api.get('/settings/household_profile')
+      .then(p => { if (p?.default_budget_rand) setBudget(Number(p.default_budget_rand)); })
+      .catch(() => {});
+  }, []);
+
   const cycleSlot = day => setSchedule(s => ({ ...s, [day]: SLOT_STATES[(SLOT_STATES.indexOf(s[day]) + 1) % 3] }));
   const toggleChip = c => setChips(cs => cs.includes(c) ? cs.filter(x => x !== c) : [...cs, c]);
 
