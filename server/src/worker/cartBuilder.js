@@ -99,10 +99,43 @@ async function scrapeSearchResults(page, itemName, limit = 8) {
   return candidates;
 }
 
-async function addToCart(scope) {
+// Best-effort read of the running cart total shown in the header (e.g. "R104.99").
+async function cartTotalCents(page) {
+  try {
+    return await page.evaluate(() => {
+      const re = /R\s?(\d[\d\s]*)[.,](\d{2})/;
+      let found = null;
+      for (const el of document.querySelectorAll('a,span,div,button,p,strong')) {
+        if (el.children.length) continue;
+        const r = el.getBoundingClientRect();
+        if (r.top < 0 || r.top > 170) continue; // header band only
+        const m = (el.textContent || '').match(re);
+        if (m) found = Number(m[1].replace(/\D/g, '')) * 100 + Number(m[2]);
+      }
+      return found;
+    });
+  } catch { return null; }
+}
+
+// Click "Add To Basket" and VERIFY the cart total rose before moving on.
+// Returns 'added' (confirmed), 'failed' (total did not change), or
+// 'unverified' (couldn't read the total — assume added but flag for a look).
+// The wait also prevents navigating away and cancelling the in-flight add.
+async function addToCart(scope, page) {
+  const before = await cartTotalCents(page);
   const btn = scope.locator(selectors.addToCart).first();
   await btn.click({ timeout: 8000 });
-  return true;
+  for (let i = 0; i < 6; i++) {
+    await page.waitForTimeout(800);
+    const after = await cartTotalCents(page);
+    if (before != null && after != null && after > before) return { result: 'added', afterCents: after };
+  }
+  const finalAfter = await cartTotalCents(page);
+  if (before != null && finalAfter != null) {
+    return finalAfter > before ? { result: 'added', afterCents: finalAfter } : { result: 'failed', afterCents: finalAfter };
+  }
+  await page.waitForTimeout(1200); // couldn't read — still give the add time to land
+  return { result: 'unverified', afterCents: finalAfter };
 }
 
 async function recordResult(runId, item, { tier, status, productName = null, productUrl = null, priceCents = null, note = null }) {
@@ -139,11 +172,16 @@ export async function buildCart(runId, { keepOpen = false } = {}) {
           try {
             await page.goto(match.entry.product_url, { waitUntil: 'domcontentloaded', timeout: 30000 });
             await page.waitForTimeout(1500);
-            await addToCart(page);
+            const add = await addToCart(page, page);
+            if (add.result === 'failed') throw new Error('add did not register'); // fall through to search
             const q = await bumpQuantity(page, page, item);
             counts.added++; counts.tier1++;
             totalCents += (match.entry.last_price_cents || 0) * q.got;
-            await recordResult(runId, item, { tier: 1, status: 'added', productName: match.entry.product_name, productUrl: match.entry.product_url, priceCents: match.entry.last_price_cents, note: q.got < q.want ? `wanted ${q.want}, set ${q.got} — adjust qty in the app` : (q.want > 1 ? `qty ${q.got}` : null) });
+            const notes = [];
+            if (q.got < q.want) notes.push(`wanted ${q.want}, set ${q.got} — adjust qty in the app`);
+            else if (q.want > 1) notes.push(`qty ${q.got}`);
+            if (add.result === 'unverified') notes.push('could not confirm — check the trolley');
+            await recordResult(runId, item, { tier: 1, status: 'added', productName: match.entry.product_name, productUrl: match.entry.product_url, priceCents: match.entry.last_price_cents, note: notes.join('; ') || null });
             continue;
           } catch (err) {
             // fall through to tier 2 — product page may have changed or item out of stock
@@ -160,13 +198,23 @@ export async function buildCart(runId, { keepOpen = false } = {}) {
         if (!picked) picked = await aiPickProduct(item.name, item.quantity, item.unit, candidates);
         if (picked) {
           try {
-            await addToCart(picked.tile);
+            const add = await addToCart(picked.tile, page);
+            if (add.result === 'failed') {
+              // genuinely didn't go into the cart — flag rather than lie
+              counts.needs_review++;
+              await recordResult(runId, item, { tier: 3, status: 'needs_review', productName: picked.name, productUrl: picked.url, note: 'found it but the add did not register — add it manually' });
+              continue;
+            }
             const q = await bumpQuantity(picked.tile, page, item);
             const priceCents = picked.priceCents ?? null;
             counts.added++; counts.tier2++;
             totalCents += (priceCents || 0) * q.got;
             await saveMapping({ itemName: item.name, productName: picked.name, productUrl: picked.url, externalProductId: picked.externalId, priceCents, confidence: 'suggested' });
-            await recordResult(runId, item, { tier: 2, status: 'added', productName: picked.name, productUrl: picked.url, priceCents, note: q.got < q.want ? `wanted ${q.want}, set ${q.got} — adjust qty in the app` : (q.want > 1 ? `qty ${q.got}` : null) });
+            const notes = [];
+            if (q.got < q.want) notes.push(`wanted ${q.want}, set ${q.got} — adjust qty in the app`);
+            else if (q.want > 1) notes.push(`qty ${q.got}`);
+            if (add.result === 'unverified') notes.push('could not confirm — check the trolley');
+            await recordResult(runId, item, { tier: 2, status: 'added', productName: picked.name, productUrl: picked.url, priceCents, note: notes.join('; ') || null });
             continue;
           } catch (err) {
             console.warn(`tier2 add failed for ${item.name}: ${err.message}`);
@@ -180,10 +228,12 @@ export async function buildCart(runId, { keepOpen = false } = {}) {
         await recordResult(runId, item, { tier: 3, status: 'error', note: err.message, productUrl: searchLink(item.name) });
       }
     }
+    // Prefer the real cart total shown on the site over our optimistic sum.
+    const realTotal = await cartTotalCents(page);
     await query(
       `UPDATE cart_runs SET status = 'done', finished_at = now(), summary = $1 WHERE id = $2`,
-      [JSON.stringify({ ...counts, total_items: items.length, est_total_cents: totalCents }), runId]);
-    console.log('cart run complete:', counts);
+      [JSON.stringify({ ...counts, total_items: items.length, est_total_cents: realTotal ?? totalCents }), runId]);
+    console.log('cart run complete:', counts, 'cart total:', realTotal != null ? `R${(realTotal / 100).toFixed(2)}` : 'unknown');
   } catch (err) {
     failed = true;
     await query(`UPDATE cart_runs SET status = 'failed', finished_at = now(), summary = $1 WHERE id = $2`,
