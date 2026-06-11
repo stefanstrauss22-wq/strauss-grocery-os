@@ -45,7 +45,10 @@ router.post('/runs/:id/notify', async (req, res, next) => {
     const run = (await query('SELECT * FROM cart_runs WHERE id = $1', [req.params.id])).rows[0];
     if (!run) return res.status(404).json({ error: 'run not found' });
     const row = (await query(`SELECT value FROM settings WHERE key = 'notify_phone'`)).rows[0];
-    const phone = row ? (typeof row.value === 'string' ? JSON.parse(row.value) : row.value) : null;
+    let raw = row ? row.value : null;
+    if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch { /* plain string */ } }
+    if (raw && typeof raw === 'object') raw = raw.phone;          // {phone:"27..."}
+    const phone = raw != null ? String(raw).replace(/[^\d]/g, '') : null; // digits only, no +
     if (!phone) return res.json({ notified: false, reason: 'no notify_phone configured' });
     const s = typeof run.summary === 'string' ? JSON.parse(run.summary) : (run.summary || {});
     const rand = s.est_total_cents ? `~R${(s.est_total_cents / 100).toFixed(0)}` : '';
