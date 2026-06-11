@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../db/db.js';
 import { searchLink } from '../services/catalogMatch.js';
+import { sendWhatsApp } from '../services/whatsappSend.js';
 
 const router = express.Router();
 
@@ -25,21 +26,34 @@ router.get('/runs/:id', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// POST /api/cart/build — kick the worker as a child process so the API stays responsive
-router.post('/build', async (req, res, next) => {
+// POST /api/cart/request — the app/phone asks for a cart build. The home-PC
+// watcher (npm run watch) picks this up, fills the trolley, and notifies.
+router.post('/request', async (req, res, next) => {
   try {
-    const { rows } = await query(`INSERT INTO cart_runs (status) VALUES ('running') RETURNING id`);
-    const runId = rows[0].id;
-    const { spawn } = await import('node:child_process');
-    const path = await import('node:path');
-    const { fileURLToPath } = await import('node:url');
-    const dir = path.dirname(fileURLToPath(import.meta.url));
-    const workerPath = path.resolve(dir, '../worker/cartBuilder.js');
-    const child = spawn(process.execPath, [workerPath, '--run-id', String(runId)], {
-      detached: true, stdio: 'ignore', env: process.env,
-    });
-    child.unref();
-    res.status(202).json({ run_id: runId, status: 'running' });
+    // Don't stack duplicate requests if one is already waiting/running.
+    const existing = await query(`SELECT id FROM cart_runs WHERE status IN ('requested','running') ORDER BY started_at DESC LIMIT 1`);
+    if (existing.rows.length) return res.status(202).json({ run_id: existing.rows[0].id, already: true });
+    const { rows } = await query(`INSERT INTO cart_runs (status) VALUES ('requested') RETURNING id`);
+    res.status(202).json({ run_id: rows[0].id });
+  } catch (e) { next(e); }
+});
+
+// POST /api/cart/runs/:id/notify — called by the watcher when a build finishes;
+// sends a WhatsApp summary to the configured notify number (settings.notify_phone).
+router.post('/runs/:id/notify', async (req, res, next) => {
+  try {
+    const run = (await query('SELECT * FROM cart_runs WHERE id = $1', [req.params.id])).rows[0];
+    if (!run) return res.status(404).json({ error: 'run not found' });
+    const row = (await query(`SELECT value FROM settings WHERE key = 'notify_phone'`)).rows[0];
+    const phone = row ? (typeof row.value === 'string' ? JSON.parse(row.value) : row.value) : null;
+    if (!phone) return res.json({ notified: false, reason: 'no notify_phone configured' });
+    const s = typeof run.summary === 'string' ? JSON.parse(run.summary) : (run.summary || {});
+    const rand = s.est_total_cents ? `~R${(s.est_total_cents / 100).toFixed(0)}` : '';
+    const msg = run.status === 'done'
+      ? `🛒 Your Sixty60 cart is ready: ${s.added || 0} items${rand ? `, ${rand}` : ''}${s.needs_review ? `, ${s.needs_review} to check` : ''}. Open Sixty60 to review & pay.`
+      : `⚠️ The cart build hit a snag. Open the app → Cart tab for details.`;
+    await sendWhatsApp(phone, msg);
+    res.json({ notified: true });
   } catch (e) { next(e); }
 });
 

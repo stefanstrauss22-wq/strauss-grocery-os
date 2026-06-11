@@ -8,16 +8,26 @@ export default function CartView() {
   const [run, setRun] = useState(null);
   const [manual, setManual] = useState(null);
   const [err, setErr] = useState(null);
+  const [requested, setRequested] = useState(false);
 
   const loadRuns = () => api.get('/cart/runs').then(setRuns).catch(e => setErr(e.message));
   useEffect(() => { loadRuns(); }, []);
 
-  // poll while a run is in progress (a build is running on the home PC)
+  // poll while a build is waiting for / running on the home PC
   useEffect(() => {
-    if (!runs.some(r => r.status === 'running')) return;
+    if (!runs.some(r => r.status === 'running' || r.status === 'requested')) return;
     const t = setInterval(loadRuns, 4000);
     return () => clearInterval(t);
   }, [runs]);
+
+  async function requestBuild() {
+    setErr(null);
+    try {
+      await api.post('/cart/request', {});
+      setRequested(true);
+      loadRuns();
+    } catch (e) { setErr(e.message); }
+  }
 
   async function openRun(id) {
     setRun(await api.get(`/cart/runs/${id}`));
@@ -48,13 +58,16 @@ export default function CartView() {
           <b> It never checks out — you always review and pay.</b>
         </p>
         <p className="muted">
-          The robot runs on the <b>home PC</b> (it needs a real browser) — double-click the
-          <b> “Build Cart” icon on the Desktop</b>, watch Chrome fill the trolley, then review &amp; pay
-          in that window. The run and its results show up here automatically while it works.
+          The robot runs on the <b>home PC</b> (it needs a real browser). Tap <b>Build cart</b> below
+          and — as long as the PC is on with the watcher running — it fills your Checkers trolley,
+          then WhatsApps you when it's ready. Because the cart sits on your Checkers account,
+          you <b>review &amp; pay in the Sixty60 app on your phone</b>.
         </p>
         <div className="row" style={{ marginTop: 4 }}>
+          <button className="primary" onClick={requestBuild}>🛒 Build cart now</button>
           <button className="ghost" onClick={showManual}>📋 Manual mode (tap-through links)</button>
         </div>
+        {requested && <p className="muted" style={{ marginTop: 8 }}>✅ Requested — your home PC will fill the trolley shortly (it must be on). Watch the run appear below; you'll get a WhatsApp when it's ready.</p>}
         {err && <div className="error-box">{err}</div>}
       </div>
 
@@ -86,7 +99,7 @@ export default function CartView() {
                 <tr key={r.id}>
                   <td>{r.id}</td>
                   <td>{new Date(r.started_at).toLocaleString('en-ZA')}</td>
-                  <td>{r.status === 'running' ? '⏳ running' : r.status}</td>
+                  <td>{r.status === 'running' ? '⏳ filling…' : r.status === 'requested' ? '🕒 waiting for PC' : r.status}</td>
                   <td>{s.added ?? '—'}</td>
                   <td>{s.needs_review ?? '—'}</td>
                   <td>{s.est_total_cents ? `R${(s.est_total_cents / 100).toFixed(2)}` : '—'}</td>
