@@ -7,27 +7,17 @@ export default function CartView() {
   const [runs, setRuns] = useState([]);
   const [run, setRun] = useState(null);
   const [manual, setManual] = useState(null);
-  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 
   const loadRuns = () => api.get('/cart/runs').then(setRuns).catch(e => setErr(e.message));
   useEffect(() => { loadRuns(); }, []);
 
-  // poll while a run is in progress
+  // poll while a run is in progress (a build is running on the home PC)
   useEffect(() => {
     if (!runs.some(r => r.status === 'running')) return;
     const t = setInterval(loadRuns, 4000);
     return () => clearInterval(t);
   }, [runs]);
-
-  async function build() {
-    setBusy(true); setErr(null);
-    try {
-      await api.post('/cart/build', {});
-      await loadRuns();
-    } catch (e) { setErr(e.message); }
-    setBusy(false);
-  }
 
   async function openRun(id) {
     setRun(await api.get(`/cart/runs/${id}`));
@@ -51,20 +41,21 @@ export default function CartView() {
   return (
     <div>
       <div className="card">
-        <h2>Sixty60 cart builder</h2>
-        <p className="muted">
-          Fills your Checkers cart from the pending list: known products are added directly (tier 1),
-          new items are searched and AI-matched (tier 2), anything uncertain is flagged for you (tier 3).
-          <b> It never checks out — you always approve and pay.</b>
+        <h2>Sixty60 cart builder 🤖</h2>
+        <p className="lead">
+          The robot fills your Checkers trolley from the list: products it knows are added directly,
+          new items are searched and AI-matched, anything uncertain is flagged for you.
+          <b> It never checks out — you always review and pay.</b>
         </p>
-        <div className="row">
-          <button className="primary" disabled={busy} onClick={build}>🤖 Build cart now</button>
+        <p className="muted">
+          The robot runs on the <b>home PC</b> (it needs a real browser) — double-click the
+          <b> “Build Cart” icon on the Desktop</b>, watch Chrome fill the trolley, then review &amp; pay
+          in that window. The run and its results show up here automatically while it works.
+        </p>
+        <div className="row" style={{ marginTop: 4 }}>
           <button className="ghost" onClick={showManual}>📋 Manual mode (tap-through links)</button>
         </div>
         {err && <div className="error-box">{err}</div>}
-        <p className="muted" style={{ marginTop: 8 }}>
-          First time? Run <code>npm run sixty60:login</code> in <code>grocery-os/server</code> to save your Checkers session.
-        </p>
       </div>
 
       {manual && (
