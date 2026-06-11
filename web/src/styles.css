@@ -186,6 +186,7 @@ ul.items .qty { color: var(--muted); font-size: 0.82rem; }
 ul.items .src { font-size: 0.64rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--cream-2); color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
 ul.items .src.whatsapp { background: var(--sage-soft); color: var(--sage-dark); }
 ul.items .src.meal_plan { background: var(--terra-soft); color: var(--terra); }
+ul.items .src.staples { background: var(--gold-soft); color: #9a7218; }
 ul.items li.urgent .name { font-weight: 700; color: var(--terra); }
 ul.items input[type="checkbox"] { width: 19px; height: 19px; accent-color: var(--sage-dark); }
 .cat-head { margin: 18px 0 4px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: var(--terra); }

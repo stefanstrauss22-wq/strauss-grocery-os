@@ -30,6 +30,17 @@ export default function ListView() {
     load();
   }
 
+  const [staplesBusy, setStaplesBusy] = useState(false);
+  async function addStaples() {
+    setStaplesBusy(true);
+    try {
+      const r = await api.post('/items/staples', {});
+      alert(`🧺 Weekly staples: ${r.added} added, ${r.skipped} already covered.${r.rotation?.length ? `\n\nThis week's rotation picks:\n• ${r.rotation.join('\n• ')}` : ''}`);
+      load();
+    } catch (e) { alert(e.message); }
+    setStaplesBusy(false);
+  }
+
   const grouped = CATEGORY_ORDER
     .map(cat => [cat, items.filter(i => i.category === cat)])
     .filter(([, arr]) => arr.length);
@@ -40,6 +51,9 @@ export default function ListView() {
         <h2>Shopping list</h2>
         <div className="spacer" />
         <span className="muted">{items.length} items</span>
+        <button className="ghost" disabled={staplesBusy} onClick={addStaples}>
+          {staplesBusy ? '⏳ picking…' : '🧺 Add weekly staples'}
+        </button>
       </div>
       <form onSubmit={add} className="chat-input">
         <input type="text" placeholder="Add an item… (e.g. 2L milk)" value={newItem} onChange={e => setNewItem(e.target.value)} />

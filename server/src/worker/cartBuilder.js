@@ -21,12 +21,27 @@ const PICK_SCHEMA = {
   additionalProperties: false,
 };
 
+let _brandPrefs;
+async function brandPrefs() {
+  if (_brandPrefs !== undefined) return _brandPrefs;
+  const r = await query(`SELECT value FROM settings WHERE key = 'shopping_preferences'`);
+  const v = r.rows.length
+    ? (typeof r.rows[0].value === 'string' ? JSON.parse(r.rows[0].value) : r.rows[0].value)
+    : null;
+  _brandPrefs = v?.preferred_brands || null;
+  return _brandPrefs;
+}
+
 async function aiPickProduct(itemName, quantity, unit, candidates) {
   if (!aiEnabled() || candidates.length === 0) return null;
+  const prefs = await brandPrefs();
+  const prefText = prefs
+    ? `\n\nTHE FAMILY'S PREFERRED BRANDS (use these unless out of stock or a clearly better deal):\n${Object.entries(prefs).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`
+    : '';
   const msg = await claude().messages.create({
     model: config.extractionModel,
     max_tokens: 500,
-    system: 'You pick the best supermarket product match for a shopping list item for a South African family of 6. Prefer sensible pack sizes, normal (not premium) brands, and best value. Return null if nothing matches the item.',
+    system: `You pick the best supermarket product match for a shopping list item for a South African family of 6. Prefer the family's preferred brands when one matches; otherwise sensible pack sizes, normal (not premium) brands, and best value. Avoid "(sponsored)" listings unless they are genuinely the best match. Return null if nothing matches the item.${prefText}`,
     messages: [{
       role: 'user',
       content: `Item: ${quantity || 1} ${unit || ''} ${itemName}\n\nCandidates:\n${candidates.map((c, i) => `${i}. ${c.name} — ${c.price || 'price unknown'}`).join('\n')}`,
@@ -35,6 +50,24 @@ async function aiPickProduct(itemName, quantity, unit, candidates) {
   });
   const { pick_index } = JSON.parse(firstText(msg));
   return pick_index === null ? null : candidates[pick_index] || null;
+}
+
+/** After the first add the tile shows a +/- stepper; click + to reach the
+ *  wanted count. Only for countable units (4 loaves), never amounts (3 L).
+ *  Soft: returns how many we actually managed. */
+const COUNTABLE = new Set([null, '', 'each', 'pack', 'loaf', 'loaves', 'x']);
+async function bumpQuantity(scope, page, item) {
+  const want = Math.round(Number(item.quantity) || 1);
+  const unit = (item.unit || '').toLowerCase();
+  if (want <= 1 || !COUNTABLE.has(unit || null)) return { got: 1, want: COUNTABLE.has(unit || null) ? want : 1 };
+  let got = 1;
+  for (; got < want; got++) {
+    try {
+      await scope.locator('button:has-text("+")').first().click({ timeout: 4000 });
+      await page.waitForTimeout(700);
+    } catch { break; }
+  }
+  return { got, want };
 }
 
 async function scrapeSearchResults(page, itemName, limit = 8) {
@@ -106,9 +139,10 @@ export async function buildCart(runId) {
             await page.goto(match.entry.product_url, { waitUntil: 'domcontentloaded', timeout: 30000 });
             await page.waitForTimeout(1500);
             await addToCart(page);
+            const q = await bumpQuantity(page, page, item);
             counts.added++; counts.tier1++;
-            totalCents += match.entry.last_price_cents || 0;
-            await recordResult(runId, item, { tier: 1, status: 'added', productName: match.entry.product_name, productUrl: match.entry.product_url, priceCents: match.entry.last_price_cents });
+            totalCents += (match.entry.last_price_cents || 0) * q.got;
+            await recordResult(runId, item, { tier: 1, status: 'added', productName: match.entry.product_name, productUrl: match.entry.product_url, priceCents: match.entry.last_price_cents, note: q.got < q.want ? `wanted ${q.want}, set ${q.got} — adjust qty in the app` : (q.want > 1 ? `qty ${q.got}` : null) });
             continue;
           } catch (err) {
             // fall through to tier 2 — product page may have changed or item out of stock
@@ -126,11 +160,12 @@ export async function buildCart(runId) {
         if (picked) {
           try {
             await addToCart(picked.tile);
+            const q = await bumpQuantity(picked.tile, page, item);
             const priceCents = picked.priceCents ?? null;
             counts.added++; counts.tier2++;
-            totalCents += priceCents || 0;
+            totalCents += (priceCents || 0) * q.got;
             await saveMapping({ itemName: item.name, productName: picked.name, productUrl: picked.url, externalProductId: picked.externalId, priceCents, confidence: 'suggested' });
-            await recordResult(runId, item, { tier: 2, status: 'added', productName: picked.name, productUrl: picked.url, priceCents });
+            await recordResult(runId, item, { tier: 2, status: 'added', productName: picked.name, productUrl: picked.url, priceCents, note: q.got < q.want ? `wanted ${q.want}, set ${q.got} — adjust qty in the app` : (q.want > 1 ? `qty ${q.got}` : null) });
             continue;
           } catch (err) {
             console.warn(`tier2 add failed for ${item.name}: ${err.message}`);
