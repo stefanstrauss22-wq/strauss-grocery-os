@@ -27,10 +27,12 @@ export default function WhatsAppSim() {
   return (
     <div className="grid cols2">
       <div className="card">
-        <h2>WhatsApp simulator</h2>
-        <p className="muted">
-          Exactly the pipeline the real WhatsApp bot uses (message → AI extraction → shopping list → reply),
-          minus the Meta account. English and Afrikaans both work. Items appear in the List tab instantly.
+        <h2>Test the bot 🧪</h2>
+        <p className="lead">
+          A practice chat that uses the <b>exact same brain</b> as the real Groceries Bot —
+          type a message, watch it understand and reply. <b>Anything you send here really does land on
+          the shopping list</b> (List tab), so it's also a quick way to add items from this screen.
+          English and Afrikaans both work.
         </p>
         <label className="field">Sending as
           <select value={name} onChange={e => setName(e.target.value)}>
@@ -47,14 +49,20 @@ export default function WhatsAppSim() {
         </form>
       </div>
       <div className="card">
-        <h2>Going live</h2>
-        <ol className="muted" style={{ lineHeight: 1.9 }}>
-          <li>Create a Meta developer app → add the <b>WhatsApp</b> product (free test number included, up to 5 recipients).</li>
-          <li>Set the webhook URL to <code>https://YOUR-SERVER/api/whatsapp/webhook</code> with your <code>WHATSAPP_VERIFY_TOKEN</code>.</li>
-          <li>Put <code>WHATSAPP_TOKEN</code> and <code>WHATSAPP_PHONE_NUMBER_ID</code> in <code>server/.env</code>.</li>
-          <li>Family members message the bot number — replies and list updates are instant.</li>
+        <h2>✅ The bot is live on WhatsApp</h2>
+        <p className="lead">Setup is done — the family uses it on real WhatsApp. This tab is just a sandbox for testing.</p>
+        <h3>How the family uses it</h3>
+        <ol className="muted" style={{ lineHeight: 2 }}>
+          <li>Open the <b>Groceries Bot</b> chat in WhatsApp.</li>
+          <li>Type what ran out — <i>"we're out of milk"</i>, <i>"koop asb 2 brode en hondekos"</i>.</li>
+          <li>The bot replies with a ✅ and the item lands on the shared <b>List</b> automatically.</li>
         </ol>
-        <p className="muted">Full steps in <code>SETUP.md</code>. No spare SIM needed: Meta's test number works today; a landline or Twilio number works for production.</p>
+        <h3>Good to know</h3>
+        <ul className="muted" style={{ lineHeight: 2 }}>
+          <li>Type, don't voice-note (voice isn't switched on yet).</li>
+          <li>Only the <b>5 registered numbers</b> can use the bot.</li>
+          <li>Posted in the family group by mistake? Forward that message to the bot.</li>
+        </ul>
       </div>
     </div>
   );

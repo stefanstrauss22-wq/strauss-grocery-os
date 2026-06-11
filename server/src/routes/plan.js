@@ -79,13 +79,25 @@ async function persistGeneratedPlan(weekStart, context, generated, { replaceDay 
   return planId;
 }
 
-// POST /api/plan/generate  { week_start, week: { budget_rand, schedule, chips, have_at_home, notes } }
+// Mark a week's plan row with a generation status so the client can poll.
+async function setPlanStatus(weekStart, status, extra = {}) {
+  await query(
+    `INSERT INTO meal_plans (week_start, status, context) VALUES ($1, $2, $3)
+     ON CONFLICT (week_start) DO UPDATE SET status = EXCLUDED.status`,
+    [weekStart, status, JSON.stringify(extra)]
+  );
+}
+
+// POST /api/plan/generate  { week_start, week: {...} }
+// Returns 202 immediately and generates in the background — AI generation takes
+// longer than gateway timeouts allow, so the client polls GET /plan/:week
+// until status flips from 'generating' to 'active' (or 'error').
 router.post('/generate', async (req, res, next) => {
   try {
     const { week_start, week = {} } = req.body;
     if (!week_start) return res.status(400).json({ error: 'week_start (Monday, YYYY-MM-DD) is required' });
+
     const profile = await getSetting('household_profile', {});
-    // feed ratings so the planner learns favourites and avoids flops
     const ratings = await query(`
       SELECT r.title, SUM(m.rating)::int AS score, COUNT(*)::int AS votes
       FROM meal_ratings m JOIN recipes r ON r.id = m.recipe_id
@@ -97,16 +109,24 @@ router.post('/generate', async (req, res, next) => {
       WHERE p.week_start >= (DATE($1) - INTERVAL '21 days') AND p.week_start < DATE($1)`, [week_start]);
     const context = {
       profile,
-      week: {
-        ...week,
-        ratings: ratings.rows,
-        recent_meals_to_avoid: recent.rows.map(r => r.title),
-      },
+      week: { ...week, ratings: ratings.rows, recent_meals_to_avoid: recent.rows.map(r => r.title) },
     };
-    const generated = await generatePlan(context);
-    const planId = await persistGeneratedPlan(week_start, context, generated);
-    await query(`UPDATE meal_plans SET status = 'active' WHERE id = $1`, [planId]);
-    res.json({ plan: await loadPlan(week_start), week_summary: generated.week_summary });
+
+    await setPlanStatus(week_start, 'generating');
+    res.status(202).json({ status: 'generating' });
+
+    // Background work — not awaited by the response.
+    (async () => {
+      try {
+        const generated = await generatePlan(context);
+        const planId = await persistGeneratedPlan(week_start, context, generated);
+        await query(`UPDATE meal_plans SET status = 'active' WHERE id = $1`, [planId]);
+        console.log(`plan generated for ${week_start}`);
+      } catch (err) {
+        console.error(`plan generation failed for ${week_start}:`, err.message);
+        await query(`UPDATE meal_plans SET status = 'error' WHERE week_start = $1`, [week_start]).catch(() => {});
+      }
+    })();
   } catch (e) { next(e); }
 });
 
@@ -128,10 +148,12 @@ router.get('/', async (req, res, next) => {
 });
 
 // POST /api/plan/:weekStart/swap  { day, reason }
+// Async like /generate: returns 202, swaps one meal in the background, client polls.
 router.post('/:weekStart/swap', async (req, res, next) => {
   try {
+    const weekStart = req.params.weekStart;
     const { day, reason } = req.body;
-    const plan = await loadPlan(req.params.weekStart);
+    const plan = await loadPlan(weekStart);
     if (!plan) return res.status(404).json({ error: 'no plan for that week' });
     const current = {
       meals: plan.meals.map(m => ({
@@ -142,9 +164,21 @@ router.post('/:weekStart/swap', async (req, res, next) => {
       })),
     };
     const ctx = typeof plan.context === 'string' ? JSON.parse(plan.context) : plan.context;
-    const generated = await swapMeal(ctx, current, day, reason);
-    await persistGeneratedPlan(req.params.weekStart, ctx, generated, { replaceDay: day, existingPlanId: plan.id });
-    res.json({ plan: await loadPlan(req.params.weekStart) });
+
+    await query(`UPDATE meal_plans SET status = 'generating' WHERE id = $1`, [plan.id]);
+    res.status(202).json({ status: 'generating' });
+
+    (async () => {
+      try {
+        const generated = await swapMeal(ctx, current, day, reason);
+        await persistGeneratedPlan(weekStart, ctx, generated, { replaceDay: day, existingPlanId: plan.id });
+        await query(`UPDATE meal_plans SET status = 'active' WHERE id = $1`, [plan.id]);
+        console.log(`swapped ${day} for ${weekStart}`);
+      } catch (err) {
+        console.error(`swap failed for ${weekStart} ${day}:`, err.message);
+        await query(`UPDATE meal_plans SET status = 'active' WHERE id = $1`, [plan.id]).catch(() => {});
+      }
+    })();
   } catch (e) { next(e); }
 });
 

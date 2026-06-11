@@ -24,6 +24,26 @@ export default function PlanView() {
   const loadPlan = ws => api.get(`/plan/${ws}`).then(setPlan).catch(() => setPlan(null));
   useEffect(() => { loadPlan(weekStart); }, [weekStart]);
 
+  // Generation/swap runs in the background on the server; poll the plan until
+  // its status flips away from 'generating'. Resolves with the finished plan.
+  function pollUntilReady(ws, { timeoutMs = 240000, intervalMs = 4000 } = {}) {
+    const start = Date.now();
+    return new Promise((resolve, reject) => {
+      const tick = async () => {
+        try {
+          const p = await api.get(`/plan/${ws}`);
+          if (p && p.status !== 'generating') return resolve(p);
+          if (Date.now() - start > timeoutMs) return reject(new Error('Still working — it is taking longer than usual. Give it a moment and refresh.'));
+          setTimeout(tick, intervalMs);
+        } catch (e) {
+          if (Date.now() - start > timeoutMs) return reject(e);
+          setTimeout(tick, intervalMs);
+        }
+      };
+      tick();
+    });
+  }
+
   // Start the budget slider from the household profile's default budget.
   useEffect(() => {
     api.get('/settings/household_profile')
@@ -37,7 +57,7 @@ export default function PlanView() {
   async function generate() {
     setBusy(true); setErr(null); setSummary(null);
     try {
-      const res = await api.post('/plan/generate', {
+      await api.post('/plan/generate', {
         week_start: weekStart,
         week: {
           budget_rand: budget,
@@ -47,8 +67,9 @@ export default function PlanView() {
           notes,
         },
       });
-      setPlan(res.plan);
-      setSummary(res.week_summary);
+      const p = await pollUntilReady(weekStart);
+      setPlan(p);
+      if (p.status === 'error') setErr('Generation hit a snag — please try again.');
     } catch (e) { setErr(e.message); }
     setBusy(false);
   }
@@ -58,8 +79,9 @@ export default function PlanView() {
     if (reason === null) return;
     setSwapping(day); setErr(null);
     try {
-      const res = await api.post(`/plan/${weekStart}/swap`, { day, reason });
-      setPlan(res.plan);
+      await api.post(`/plan/${weekStart}/swap`, { day, reason });
+      const p = await pollUntilReady(weekStart);
+      setPlan(p);
     } catch (e) { setErr(e.message); }
     setSwapping(null);
   }
@@ -121,6 +143,7 @@ export default function PlanView() {
         <button className="primary" disabled={busy} onClick={generate}>
           {busy ? <span><span className="spinner">⏳</span> Planning…</span> : (plan ? 'Regenerate plan (locked meals kept)' : 'Generate this week\'s plan')}
         </button>
+        {busy && <p className="muted" style={{ marginTop: 10 }}>Cooking up 7 dinners with costed ingredients — this takes about a minute. You can leave this open.</p>}
         {err && <div className="error-box">{err}</div>}
         {summary && <p className="muted" style={{ marginTop: 10 }}>{summary}</p>}
       </div>

@@ -11,12 +11,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const STATE_PATH = path.resolve(__dirname, '../../data/sixty60-state.json');
 
 async function launchBrowser({ headless }) {
-  for (const channel of ['msedge', 'chrome']) {
+  // Prefer Chrome (the family's everyday browser), fall back to Edge.
+  // Override with BROWSER_CHANNEL=msedge if needed.
+  const preferred = process.env.BROWSER_CHANNEL;
+  const channels = preferred ? [preferred] : ['chrome', 'msedge'];
+  for (const channel of channels) {
     try {
       return await chromium.launch({ channel, headless });
     } catch { /* try next channel */ }
   }
-  throw new Error('Could not launch Edge or Chrome. Install one, or run: npx playwright install chromium');
+  throw new Error('Could not launch Chrome or Edge. Install one, or run: npx playwright install chromium');
 }
 
 async function main() {

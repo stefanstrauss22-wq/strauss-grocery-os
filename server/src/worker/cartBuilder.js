@@ -115,10 +115,11 @@ async function recordResult(runId, item, { tier, status, productName = null, pro
   }
 }
 
-export async function buildCart(runId) {
+export async function buildCart(runId, { keepOpen = false } = {}) {
   if (!fs.existsSync(STATE_PATH)) {
     throw new Error('No Sixty60 session found. Run: npm run sixty60:login');
   }
+  let failed = false;
   const items = (await query(`SELECT * FROM shopping_items WHERE status = 'pending' ORDER BY category, name`)).rows;
   // Visible browser by default: the Sixty60 site's bot protection is kinder to
   // headed browsers, and watching the robot shop is half the fun. Set
@@ -184,11 +185,25 @@ export async function buildCart(runId) {
       [JSON.stringify({ ...counts, total_items: items.length, est_total_cents: totalCents }), runId]);
     console.log('cart run complete:', counts);
   } catch (err) {
+    failed = true;
     await query(`UPDATE cart_runs SET status = 'failed', finished_at = now(), summary = $1 WHERE id = $2`,
       [JSON.stringify({ error: err.message, ...counts }), runId]);
     throw err;
   } finally {
-    await browser.close();
+    if (keepOpen && !failed) {
+      // Leave the window open on the storefront so the human can review the
+      // trolley and check out. The cart lives on the Checkers account, so the
+      // items are already there — they just click the trolley icon (top-right).
+      try { await page.goto('https://www.checkers.co.za/', { waitUntil: 'domcontentloaded', timeout: 20000 }); } catch { /* stay put */ }
+      console.log('\n────────────────────────────────────────────────────────');
+      console.log('🛒  Cart filled — the browser is staying OPEN for you.');
+      console.log('    Click the trolley icon (top-right) to review your basket,');
+      console.log('    choose a delivery slot, and check out & pay in this window.');
+      console.log('    When you are done, just CLOSE the browser window.');
+      console.log('────────────────────────────────────────────────────────\n');
+      await page.waitForEvent('close', { timeout: 0 }).catch(() => {});
+    }
+    await browser.close().catch(() => {});
   }
 }
 
@@ -203,7 +218,7 @@ if (process.argv[1] && process.argv[1].endsWith('cartBuilder.js')) {
       const { rows } = await query(`INSERT INTO cart_runs (status) VALUES ('running') RETURNING id`);
       runId = rows[0].id;
     }
-    await buildCart(runId);
+    await buildCart(runId, { keepOpen: true });
     process.exit(0);
   })().catch(err => { console.error(err); process.exit(1); });
 }
