@@ -206,8 +206,9 @@ ul.items input[type="checkbox"] { width: 19px; height: 19px; accent-color: var(-
 .hero-body h2 { margin: 0 0 4px; font-size: 1.45rem; font-weight: 600; }
 .hero-body p { margin: 0 0 10px; color: var(--muted); font-size: 0.9rem; }
 
-.week-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.week-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
 .week-strip .wday {
+  min-width: 0; /* allow the track to shrink below content width */
   background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm);
   padding: 10px 4px; text-align: center; cursor: pointer; transition: all 0.12s ease;
 }
@@ -215,7 +216,7 @@ ul.items input[type="checkbox"] { width: 19px; height: 19px; accent-color: var(-
 .week-strip .wday.today { border-color: var(--terra); background: var(--terra-soft); }
 .week-strip .d { font-size: 0.64rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .week-strip .e { font-size: 1.35rem; margin: 2px 0; }
-.week-strip .t { font-size: 0.62rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.week-strip .t { font-size: 0.62rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 @media (max-width: 640px) { .week-strip .t { display: none; } }
 
 .tile { background: var(--card); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow-soft); border: 1px solid rgba(237, 228, 212, 0.7); }
