@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, currentWeekStart } from '../api.js';
+import { foodArt } from '../foodArt.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -125,19 +126,31 @@ export default function PlanView() {
             <button className="primary" disabled={busy} onClick={toList}>Send ingredients to shopping list →</button>
           </div>
           <div className="grid cols2" style={{ marginTop: 10 }}>
-            {plan.meals.map(meal => (
+            {plan.meals.map(meal => {
+              const art = foodArt(meal);
+              const tags = (typeof meal.tags === 'string' ? JSON.parse(meal.tags || '[]') : meal.tags) || [];
+              return (
               <div key={meal.entry_id} className={`meal-card ${meal.locked ? 'locked' : ''}`}>
-                <div className="day">{meal.day_of_week}</div>
+                <div className="meal-art" style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
+                  <span className="day-pill">{meal.day_of_week}</span>
+                  {meal.locked && <span className="lock-pill">📌</span>}
+                  <span className="emoji">{art.emoji}</span>
+                </div>
+                <div className="meal-body">
                 <h3>{meal.title || '—'}</h3>
-                <p className="muted">{meal.description}</p>
+                <p className="desc">{meal.description}</p>
+                <div style={{ marginBottom: 6 }}>
+                  {meal.cuisine && <span className="tag gold">{meal.cuisine}</span>}
+                  {tags.slice(0, 3).map(t => <span key={t} className="tag">{t}</span>)}
+                </div>
                 <div className="meta">
                   <span>⏱ {(meal.prep_minutes || 0) + (meal.cook_minutes || 0)} min</span>
                   <span>💰 ~R{Math.round((meal.est_cost_cents || 0) / 100)}</span>
-                  <span>🍽 {meal.servings} servings</span>
+                  <span>🍽 {meal.servings}</span>
                 </div>
                 {meal.ingredients?.length > 0 && (
                   <details>
-                    <summary className="muted" style={{ cursor: 'pointer', marginTop: 6 }}>Recipe & ingredients</summary>
+                    <summary>Recipe & ingredients</summary>
                     <ul className="muted" style={{ paddingLeft: 18 }}>
                       {meal.ingredients.map((ing, i) => (
                         <li key={i}>{ing.quantity} {ing.unit || ''} {ing.name}</li>
@@ -156,8 +169,9 @@ export default function PlanView() {
                     <button className="ghost tiny" onClick={() => rate(meal, -1)}>👎</button>
                   </>}
                 </div>
+                </div>
               </div>
-            ))}
+            );})}
           </div>
         </div>
       )}

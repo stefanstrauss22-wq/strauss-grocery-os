@@ -1,46 +1,133 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../api.js';
+import { api, currentWeekStart } from '../api.js';
+import { foodArt, dayShort, todayName } from '../foodArt.js';
+
+const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function Dashboard({ goTo }) {
   const [data, setData] = useState(null);
+  const [plan, setPlan] = useState(null);
+  const [items, setItems] = useState([]);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
     api.get('/dashboard').then(setData).catch(e => setErr(e.message));
+    api.get(`/plan/${currentWeekStart()}`).then(setPlan).catch(() => setPlan(null));
+    api.get('/items?status=all').then(setItems).catch(() => {});
   }, []);
 
   if (err) return <div className="error-box">{err}</div>;
-  if (!data) return <p className="muted">Loading…</p>;
+  if (!data) return <p className="muted">Setting the table…</p>;
+
+  const meals = plan?.meals || [];
+  const tonight = meals.find(m => m.day_of_week === todayName()) || meals[0];
+  const art = tonight ? foodArt(tonight) : null;
+
+  // Budget insight: planned cost vs the week's budget from the wizard
+  const ctx = plan ? (typeof plan.context === 'string' ? JSON.parse(plan.context) : plan.context) : null;
+  const budget = ctx?.week?.budget_rand || null;
+  const plannedRand = Math.round(meals.reduce((s, m) => s + (m.est_cost_cents || 0), 0) / 100);
+
+  // Shopping progress: this list cycle
+  const pending = items.filter(i => i.status === 'pending').length;
+  const inCart = items.filter(i => i.status === 'in_cart').length;
+  const done = items.filter(i => i.status === 'purchased').length;
+  const cycleTotal = pending + inCart + done;
+  const shopPct = cycleTotal ? Math.round(((inCart + done) / cycleTotal) * 100) : 0;
 
   return (
     <div>
+      {/* Tonight's dinner hero */}
+      {tonight ? (
+        <div className="hero">
+          <div className="hero-art" style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
+            <span className="kicker">{tonight.day_of_week === todayName() ? "Tonight's dinner" : `${tonight.day_of_week}'s dinner`}</span>
+            <span className="emoji">{art.emoji}</span>
+          </div>
+          <div className="hero-body">
+            <h2>{tonight.title}</h2>
+            <p>{tonight.description}</p>
+            <div className="row">
+              <span className="tag">⏱ {(tonight.prep_minutes || 0) + (tonight.cook_minutes || 0)} min</span>
+              <span className="tag terra">💰 ~R{Math.round((tonight.est_cost_cents || 0) / 100)}</span>
+              {tonight.cuisine && <span className="tag gold">{tonight.cuisine}</span>}
+              <div className="spacer" />
+              <button className="ghost" onClick={() => goTo('plan')}>See the recipe →</button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="hero">
+          <div className="hero-art" style={{ background: 'linear-gradient(135deg, #F1E7D6, #DBC4A4)' }}>
+            <span className="emoji">🧑‍🍳</span>
+          </div>
+          <div className="hero-body">
+            <h2>No plan for this week yet</h2>
+            <p>Two minutes with the weekly wizard and dinner is sorted — budget, busy nights, braai and all.</p>
+            <button className="primary terra" onClick={() => goTo('plan')}>Plan this week's dinners</button>
+          </div>
+        </div>
+      )}
+
+      {/* Week at a glance */}
+      {meals.length > 0 && (
+        <div className="card">
+          <h2>The week at a glance</h2>
+          <div className="week-strip" style={{ marginTop: 10 }}>
+            {DAY_ORDER.map(day => {
+              const m = meals.find(x => x.day_of_week === day);
+              const a = m ? foodArt(m) : { emoji: '·' };
+              return (
+                <div key={day} className={`wday ${day === todayName() ? 'today' : ''}`} onClick={() => goTo('plan')} title={m?.title || ''}>
+                  <div className="d">{dayShort(day)}</div>
+                  <div className="e">{a.emoji}</div>
+                  <div className="t">{m?.title || '—'}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Insight tiles */}
       <div className="grid cols3">
-        <div className="card stat">
-          <div className="n">{data.pending_items}</div>
-          <div className="l">items on the list</div>
+        <div className="tile">
+          <div className="t-label">💰 Budget</div>
+          {budget ? (
+            <>
+              <div className="t-value">R{plannedRand} <span style={{ fontSize: '0.95rem', color: 'var(--muted)' }}>of R{budget}</span></div>
+              <div className="t-sub">{plannedRand <= budget ? `R${budget - plannedRand} breathing room` : `R${plannedRand - budget} over — swap a meal cheaper`}</div>
+              <div className="progress terra"><div style={{ width: `${Math.min(100, Math.round((plannedRand / budget) * 100))}%` }} /></div>
+            </>
+          ) : (
+            <>
+              <div className="t-value">—</div>
+              <div className="t-sub">Set a budget in the weekly wizard</div>
+            </>
+          )}
         </div>
-        <div className="card stat">
-          <div className="n">{data.catalog_confirmed}/{data.catalog_size}</div>
-          <div className="l">catalog products confirmed</div>
+        <div className="tile">
+          <div className="t-label">🛒 Shopping</div>
+          <div className="t-value">{pending} <span style={{ fontSize: '0.95rem', color: 'var(--muted)' }}>to buy</span></div>
+          <div className="t-sub">{inCart ? `${inCart} in the trolley · ` : ''}{done ? `${done} bought` : 'list fills via WhatsApp + the plan'}</div>
+          <div className="progress"><div style={{ width: `${shopPct}%` }} /></div>
         </div>
-        <div className="card stat">
-          <div className="n">{data.latest_plan ? new Date(data.latest_plan.week_start).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : '—'}</div>
-          <div className="l">latest meal plan week</div>
+        <div className="tile">
+          <div className="t-label">🧠 Pantry memory</div>
+          <div className="t-value">{data.catalog_confirmed}<span style={{ fontSize: '0.95rem', color: 'var(--muted)' }}>/{data.catalog_size}</span></div>
+          <div className="t-sub">products it knows by heart</div>
+          <div className="progress"><div style={{ width: `${data.catalog_size ? Math.round((data.catalog_confirmed / data.catalog_size) * 100) : 0}%` }} /></div>
         </div>
       </div>
 
-      <div className="card">
-        <h2>This week's flow</h2>
-        <ol className="muted" style={{ lineHeight: 2 }}>
-          <li><a onClick={() => goTo('plan')} href="#">Generate the weekly plan</a> (budget, schedule, mood chips)</li>
-          <li>Push plan ingredients to the <a onClick={() => goTo('list')} href="#">shopping list</a> — WhatsApp items land there automatically</li>
-          <li><a onClick={() => goTo('cart')} href="#">Build the Sixty60 cart</a>, review, then check out yourself in the app</li>
+      {/* How it flows */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <h2>How the kitchen runs 🍳</h2>
+        <ol className="muted" style={{ lineHeight: 2.1, margin: '6px 0 0', paddingLeft: 20 }}>
+          <li>Out of something? The family tells <b>Groceries Bot</b> on WhatsApp — it lands on the <a onClick={() => goTo('list')} href="#">list</a> by itself.</li>
+          <li>Weekend: <a onClick={() => goTo('plan')} href="#">plan the week's dinners</a> and send the ingredients across.</li>
+          <li>Shop day: <a onClick={() => goTo('cart')} href="#">the robot packs the Sixty60 trolley</a> — you check it and press Pay.</li>
         </ol>
-        {data.last_cart_run && (
-          <p className="muted">
-            Last cart run: <b>{data.last_cart_run.status}</b> ({new Date(data.last_cart_run.started_at).toLocaleString('en-ZA')})
-          </p>
-        )}
       </div>
     </div>
   );

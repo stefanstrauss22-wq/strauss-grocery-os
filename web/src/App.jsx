@@ -9,14 +9,22 @@ import WhatsAppSim from './views/WhatsAppSim.jsx';
 import SettingsView from './views/SettingsView.jsx';
 
 const TABS = [
-  ['dashboard', '🏠 Home'],
-  ['plan', '🍽️ Plan'],
-  ['list', '🛒 List'],
-  ['cart', '🤖 Cart'],
-  ['catalog', '📦 Catalog'],
-  ['whatsapp', '💬 WhatsApp'],
-  ['settings', '⚙️ Settings'],
+  ['dashboard', '🏠', 'Home'],
+  ['plan', '🍽️', 'Plan'],
+  ['list', '🛒', 'List'],
+  ['cart', '🤖', 'Cart'],
+  ['catalog', '📦', 'Catalog'],
+  ['whatsapp', '💬', 'Chat'],
+  ['settings', '⚙️', 'Settings'],
 ];
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 5) return 'Up late';
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
 export default function App() {
   const [tab, setTab] = useState('dashboard');
@@ -29,18 +37,24 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>🛒 Strauss Grocery OS</h1>
+        <div>
+          <h1>{greeting()}, Strauss family 🧑‍🍳</h1>
+          <div className="sub">What's cooking this week?</div>
+        </div>
         {health && (
           <div className="badges">
-            <span className={`badge ${health.ok ? 'ok' : 'err'}`}>{health.ok ? `db: ${health.db}` : 'API offline'}</span>
+            <span className={`badge ${health.ok ? 'ok' : 'err'}`}>{health.ok ? '● online' : '● offline'}</span>
             <span className={`badge ${health.ai ? 'ok' : 'warn'}`}>AI {health.ai ? 'on' : 'off'}</span>
-            <span className={`badge ${health.whatsapp ? 'ok' : 'warn'}`}>WA {health.whatsapp ? 'live' : 'sim'}</span>
+            <span className={`badge ${health.whatsapp ? 'ok' : 'warn'}`}>{health.whatsapp ? 'WhatsApp live' : 'WA sim'}</span>
           </div>
         )}
       </header>
       <nav className="tabs">
-        {TABS.map(([id, label]) => (
-          <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>
+        {TABS.map(([id, ico, label]) => (
+          <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
+            <span className="ico">{ico}</span>
+            <span>{label}</span>
+          </button>
         ))}
       </nav>
       <main className="content">
