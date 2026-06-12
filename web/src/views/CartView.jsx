@@ -35,7 +35,7 @@ export default function CartView() {
 
   async function complete(id) {
     const res = await api.post(`/cart/runs/${id}/complete`, {});
-    alert(`${res.purchased} items marked purchased and added to history. Now check out in the Sixty60 app 🛵`);
+    alert(`${res.purchased} items marked purchased and added to history. 🛵`);
     setRun(null); loadRuns();
   }
 
@@ -60,8 +60,12 @@ export default function CartView() {
         <p className="muted">
           The robot runs on the <b>home PC</b> (it needs a real browser). Tap <b>Build cart</b> below
           and — as long as the PC is on with the watcher running — it fills your Checkers trolley,
-          then WhatsApps you when it's ready. Because the cart sits on your Checkers account,
-          you <b>review &amp; pay in the Sixty60 app on your phone</b>.
+          then WhatsApps you when it's ready.
+        </p>
+        <p className="muted">
+          ⚠️ <b>Check out on the Checkers <i>website</i></b> (checkers.co.za, logged in) — in the
+          browser the robot leaves open, or in your phone's browser. The Sixty60 <i>mobile app</i>
+          keeps a <b>separate basket</b>, so the robot's order won't show there.
         </p>
         <div className="row" style={{ marginTop: 4 }}>
           <button className="primary" onClick={requestBuild}>🛒 Build cart now</button>

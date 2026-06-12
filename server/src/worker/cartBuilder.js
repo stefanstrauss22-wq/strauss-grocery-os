@@ -228,12 +228,14 @@ export async function buildCart(runId, { keepOpen = false } = {}) {
         await recordResult(runId, item, { tier: 3, status: 'error', note: err.message, productUrl: searchLink(item.name) });
       }
     }
-    // Prefer the real cart total shown on the site over our optimistic sum.
-    const realTotal = await cartTotalCents(page);
+    // est_total = sum of the picked item prices (reliable). The on-page header
+    // read is kept only as a secondary signal — it's easily fooled by other
+    // "Rxx" text near the top, so we don't display it as the grand total.
+    const headerRead = await cartTotalCents(page);
     await query(
       `UPDATE cart_runs SET status = 'done', finished_at = now(), summary = $1 WHERE id = $2`,
-      [JSON.stringify({ ...counts, total_items: items.length, est_total_cents: realTotal ?? totalCents }), runId]);
-    console.log('cart run complete:', counts, 'cart total:', realTotal != null ? `R${(realTotal / 100).toFixed(2)}` : 'unknown');
+      [JSON.stringify({ ...counts, total_items: items.length, est_total_cents: totalCents, header_total_cents: headerRead }), runId]);
+    console.log('cart run complete:', counts, 'est total:', `R${(totalCents / 100).toFixed(2)}`);
   } catch (err) {
     failed = true;
     await query(`UPDATE cart_runs SET status = 'failed', finished_at = now(), summary = $1 WHERE id = $2`,

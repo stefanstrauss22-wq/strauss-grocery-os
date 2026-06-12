@@ -53,7 +53,7 @@ router.post('/runs/:id/notify', async (req, res, next) => {
     const s = typeof run.summary === 'string' ? JSON.parse(run.summary) : (run.summary || {});
     const rand = s.est_total_cents ? `~R${(s.est_total_cents / 100).toFixed(0)}` : '';
     const msg = run.status === 'done'
-      ? `🛒 Your Sixty60 cart is ready: ${s.added || 0} items${rand ? `, ${rand}` : ''}${s.needs_review ? `, ${s.needs_review} to check` : ''}. Open Sixty60 to review & pay.`
+      ? `🛒 Your Checkers cart is ready: ${s.added || 0} items${rand ? `, ${rand}` : ''}${s.needs_review ? `, ${s.needs_review} to check` : ''}. Open checkers.co.za (logged in, NOT the Sixty60 app) to review & pay.`
       : `⚠️ The cart build hit a snag. Open the app → Cart tab for details.`;
     await sendWhatsApp(phone, msg);
     res.json({ notified: true });
