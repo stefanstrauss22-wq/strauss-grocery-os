@@ -1,9 +1,28 @@
 import express from 'express';
 import { query } from '../db/db.js';
-import { searchLink } from '../services/catalogMatch.js';
+import { searchLink, saveMapping } from '../services/catalogMatch.js';
 import { sendWhatsApp } from '../services/whatsappSend.js';
 
 const router = express.Router();
+
+// PATCH /api/cart/run-items/:id — the human corrects the robot's pick before
+// checkout: which product/brand was actually bought, the quantity, or whether
+// it was bought at all. These feed the catalog when "I checked out" is tapped.
+router.patch('/run-items/:id', async (req, res, next) => {
+  try {
+    const { product_name, price_cents, final_quantity, bought } = req.body;
+    await query(
+      `UPDATE cart_run_items SET
+         product_name   = COALESCE($1, product_name),
+         price_cents    = COALESCE($2, price_cents),
+         final_quantity = COALESCE($3, final_quantity),
+         bought         = COALESCE($4, bought)
+       WHERE id = $5`,
+      [product_name ?? null, price_cents ?? null, final_quantity ?? null,
+       bought === undefined ? null : Boolean(bought), req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
 
 // GET /api/cart/runs
 router.get('/runs', async (req, res, next) => {
@@ -68,21 +87,34 @@ router.get('/manual', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// POST /api/cart/runs/:id/complete — user finished checkout; mark items purchased, feed history
+// POST /api/cart/runs/:id/complete — user finished checkout. Records the FINAL
+// (human-corrected) products + quantities to purchase_history, and confirms the
+// ingredient→product mappings so next week the robot buys exactly these.
 router.post('/runs/:id/complete', async (req, res, next) => {
   try {
     const items = (await query(
-      `SELECT c.*, s.name AS item_name, s.quantity FROM cart_run_items c
+      `SELECT c.*, s.name AS item_name, s.quantity AS list_qty FROM cart_run_items c
        JOIN shopping_items s ON s.id = c.shopping_item_id
        WHERE c.run_id = $1 AND c.status IN ('added','substituted')`, [req.params.id])).rows;
+    let purchased = 0;
     for (const it of items) {
+      if (it.bought === false) {
+        // robot added it but you didn't buy it — keep it on the list
+        await query(`UPDATE shopping_items SET status = 'pending', updated_at = now() WHERE id = $1`, [it.shopping_item_id]);
+        continue;
+      }
+      const qty = it.final_quantity ?? it.list_qty ?? 1;
       await query(`UPDATE shopping_items SET status = 'purchased', updated_at = now() WHERE id = $1`, [it.shopping_item_id]);
       await query(`INSERT INTO purchase_history (item_name, quantity, price_cents) VALUES ($1,$2,$3)`,
-        [it.item_name, it.quantity || 1, it.price_cents]);
-      await query(`UPDATE product_catalog SET times_purchased = times_purchased + 1, last_purchased_at = now()
-                   WHERE product_name = $1`, [it.product_name]);
+        [it.item_name, qty, it.price_cents]);
+      // Confirm the mapping with whatever you actually bought (corrected brand & price).
+      if (it.product_name) {
+        await saveMapping({ itemName: it.item_name, productName: it.product_name, productUrl: it.product_url, priceCents: it.price_cents, confidence: 'confirmed' });
+        await query(`UPDATE product_catalog SET times_purchased = times_purchased + 1, last_purchased_at = now() WHERE product_name = $1`, [it.product_name]);
+      }
+      purchased++;
     }
-    res.json({ purchased: items.length });
+    res.json({ purchased });
   } catch (e) { next(e); }
 });
 

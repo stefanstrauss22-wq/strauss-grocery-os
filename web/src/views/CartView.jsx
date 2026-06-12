@@ -33,6 +33,12 @@ export default function CartView() {
     setRun(await api.get(`/cart/runs/${id}`));
   }
 
+  // Save a per-item correction (optimistic local update + PATCH).
+  async function patchItem(it, patch) {
+    setRun(r => ({ ...r, items: r.items.map(x => x.id === it.id ? { ...x, ...patch } : x) }));
+    try { await api.patch(`/cart/run-items/${it.id}`, patch); } catch (e) { setErr(e.message); }
+  }
+
   async function complete(id) {
     const res = await api.post(`/cart/runs/${id}/complete`, {});
     alert(`${res.purchased} items marked purchased and added to history. 🛵`);
@@ -118,25 +124,48 @@ export default function CartView() {
       {run && (
         <div className="card">
           <div className="row">
-            <h2>Run #{run.id} — review</h2>
+            <h2>Run #{run.id} — review &amp; confirm</h2>
             <div className="spacer" />
             {run.status === 'done' && (
-              <button className="primary" onClick={() => complete(run.id)}>✅ I checked out — mark purchased</button>
+              <button className="primary" onClick={() => complete(run.id)}>✅ I checked out — confirm purchases</button>
             )}
           </div>
+          <p className="muted">
+            Changed a brand or quantity at checkout? <b>Fix it here</b>, then tap <b>I checked out</b> —
+            the bot remembers your corrections and buys exactly these next time. Untick <b>Bought</b> for
+            anything you removed.
+          </p>
           <table className="plain">
-            <thead><tr><th></th><th>Item</th><th>Product</th><th>Tier</th><th>Price</th><th>Note</th></tr></thead>
+            <thead><tr><th></th><th>Item</th><th>Product you bought</th><th>Qty</th><th>Price (R)</th><th>Bought</th></tr></thead>
             <tbody>
-              {run.items.map(it => (
-                <tr key={it.id}>
+              {run.items.map(it => {
+                const editable = it.status === 'added' || it.status === 'substituted';
+                return (
+                <tr key={it.id} style={it.bought === false ? { opacity: 0.5 } : undefined}>
                   <td>{STATUS_ICON[it.status] || it.status}</td>
                   <td>{it.item_name}</td>
-                  <td>{it.product_url ? <a href={it.product_url} target="_blank" rel="noreferrer">{it.product_name || 'open ↗'}</a> : (it.product_name || '—')}</td>
-                  <td>{it.tier}</td>
-                  <td>{it.price_cents ? `R${(it.price_cents / 100).toFixed(2)}` : '—'}</td>
-                  <td className="muted">{it.note}</td>
+                  <td>
+                    {editable ? (
+                      <input type="text" defaultValue={it.product_name || ''} style={{ minWidth: 200 }}
+                        onBlur={e => e.target.value !== (it.product_name || '') && patchItem(it, { product_name: e.target.value })} />
+                    ) : (
+                      <span className="muted">{it.note || '—'} {it.product_url && <a href={it.product_url} target="_blank" rel="noreferrer">search ↗</a>}</span>
+                    )}
+                  </td>
+                  <td>{editable ? (
+                    <input type="number" min="1" defaultValue={Number(it.final_quantity ?? it.quantity ?? 1)} style={{ width: 56 }}
+                      onBlur={e => patchItem(it, { final_quantity: Number(e.target.value) })} />
+                  ) : '—'}</td>
+                  <td>{editable ? (
+                    <input type="number" step="0.01" defaultValue={it.price_cents ? (it.price_cents / 100).toFixed(2) : ''} style={{ width: 80 }}
+                      onBlur={e => patchItem(it, { price_cents: Math.round(Number(e.target.value) * 100) })} />
+                  ) : '—'}</td>
+                  <td>{editable && (
+                    <input type="checkbox" defaultChecked={it.bought !== false}
+                      onChange={e => patchItem(it, { bought: e.target.checked })} />
+                  )}</td>
                 </tr>
-              ))}
+              );})}
             </tbody>
           </table>
         </div>
