@@ -32,6 +32,29 @@ async function brandPrefs() {
   return _brandPrefs;
 }
 
+const _norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
+
+// Match an item to its preferred-brand entry by token overlap with the key.
+function preferredBrandFor(itemName, prefs) {
+  if (!prefs) return null;
+  const itTok = new Set(_norm(itemName));
+  let best = null, bestScore = 0;
+  for (const [key, val] of Object.entries(prefs)) {
+    const score = _norm(key.replace('/', ' ')).filter(t => itTok.has(t)).length;
+    if (score > bestScore) { bestScore = score; best = val; }
+  }
+  return bestScore > 0 ? best : null;
+}
+
+// Turn a verbose brand note into a concise search query, e.g.
+// "SASKO Low GI Wholewheat or Blue Ribbon... (buy 4-6)" -> "SASKO Low GI Wholewheat".
+function brandSearchTerm(brandText, itemName) {
+  if (!brandText) return itemName;
+  let t = String(brandText).split(/\bor\b|;|\(|,/i)[0].trim();
+  t = t.split(/\s+/).slice(0, 5).join(' ');
+  return t || itemName;
+}
+
 async function aiPickProduct(itemName, quantity, unit, candidates) {
   if (!aiEnabled() || candidates.length === 0) return null;
   const prefs = await brandPrefs();
@@ -189,7 +212,13 @@ export async function buildCart(runId, { keepOpen = false } = {}) {
           }
         }
         // ---- Tier 2: search + (AI) pick ----
-        const candidates = await scrapeSearchResults(page, item.name);
+        // If we know the family's preferred brand, search for it directly so the
+        // right product is actually among the results (not buried past the top few).
+        const prefs = await brandPrefs();
+        const preferred = preferredBrandFor(item.name, prefs);
+        let candidates = [];
+        if (preferred) candidates = await scrapeSearchResults(page, brandSearchTerm(preferred, item.name));
+        if (!candidates.length) candidates = await scrapeSearchResults(page, item.name);
         let picked = null;
         if (match && match.entry) {
           // we know the product name — find it in results without AI
