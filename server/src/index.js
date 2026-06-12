@@ -9,6 +9,7 @@ import planRouter from './routes/plan.js';
 import catalogRouter from './routes/catalog.js';
 import whatsappRouter from './routes/whatsapp.js';
 import cartRouter from './routes/cart.js';
+import ordersRouter from './routes/orders.js';
 import householdRouter from './routes/household.js';
 
 const app = express();
@@ -47,6 +48,7 @@ app.use('/api/plan', planRouter);
 app.use('/api/catalog', catalogRouter);
 app.use('/api/whatsapp', whatsappRouter);
 app.use('/api/cart', cartRouter);
+app.use('/api/orders', ordersRouter);
 app.use('/api', householdRouter);
 
 // error handler
