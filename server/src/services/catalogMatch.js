@@ -52,7 +52,8 @@ export async function saveMapping({ itemName, productName, productUrl, externalP
   `, [key, retailer, productName, productUrl || null, externalProductId || null, packSize || null, priceCents || null, confidence]);
 }
 
-/** Sixty60 search URL fallback — always works, even when automation is down. */
+/** Sixty60 search URL fallback — always works, even when automation is down.
+ * Checkers uses the `Search` query param (capital S) — `?q=` does not run a search. */
 export function searchLink(itemName) {
-  return `https://www.checkers.co.za/search?q=${encodeURIComponent(itemName)}`;
+  return `https://www.checkers.co.za/search?Search=${encodeURIComponent(itemName)}`;
 }
