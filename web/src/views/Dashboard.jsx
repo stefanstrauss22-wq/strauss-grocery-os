@@ -8,6 +8,7 @@ export default function Dashboard({ goTo }) {
   const [data, setData] = useState(null);
   const [plan, setPlan] = useState(null);
   const [items, setItems] = useState([]);
+  const [showRecipe, setShowRecipe] = useState(false);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
@@ -53,8 +54,33 @@ export default function Dashboard({ goTo }) {
               <span className="tag terra">💰 ~R{Math.round((tonight.est_cost_cents || 0) / 100)}</span>
               {tonight.cuisine && <span className="tag gold">{tonight.cuisine}</span>}
               <div className="spacer" />
-              <button className="ghost" onClick={() => goTo('plan')}>See the recipe →</button>
+              <button className="ghost" onClick={() => setShowRecipe(v => !v)}>
+                {showRecipe ? 'Hide recipe ▲' : 'See the recipe →'}
+              </button>
             </div>
+            {showRecipe && (
+              <div className="recipe-expand" style={{ marginTop: 12 }}>
+                {tonight.ingredients?.length > 0 && (
+                  <>
+                    <h4 style={{ margin: '0 0 6px' }}>Ingredients</h4>
+                    <ul className="muted" style={{ paddingLeft: 18, margin: '0 0 12px' }}>
+                      {tonight.ingredients.map((ing, i) => (
+                        <li key={i}>{Number(ing.quantity)} {ing.unit || ''} {ing.name}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {tonight.instructions && (
+                  <>
+                    <h4 style={{ margin: '0 0 6px' }}>Method</h4>
+                    <p className="muted" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{tonight.instructions}</p>
+                  </>
+                )}
+                {!tonight.ingredients?.length && !tonight.instructions && (
+                  <p className="muted" style={{ margin: 0 }}>No recipe details for this one — it's a no-cook / leftovers night.</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       ) : (
