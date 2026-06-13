@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, todayISO } from '../api.js';
 import { foodArt, dayShort } from '../foodArt.js';
+import TodoList from './TodoList.jsx';
 
 const isoDate = v => String(v).slice(0, 10);
 
@@ -155,6 +156,9 @@ export default function Dashboard({ goTo }) {
           <li>Shop day: <a onClick={() => goTo('cart')} href="#">the robot packs the Sixty60 trolley</a> — you check it and press Pay.</li>
         </ol>
       </div>
+
+      {/* Family to-do list */}
+      <TodoList />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import express from 'express';
 import { query } from '../db/db.js';
 import { config } from '../config.js';
-import { extractGroceryItems } from '../services/extraction.js';
+import { triageMessage } from '../services/extraction.js';
 import { sendWhatsApp, downloadMedia, transcribeAudio } from '../services/whatsappSend.js';
 import { normalizeName, normalizeUnit } from '../services/consolidate.js';
 
@@ -9,7 +9,8 @@ const router = express.Router();
 
 /** Shared pipeline: text -> extraction -> shopping_items -> reply text. */
 async function processMessage({ waMessageId = null, fromPhone, fromName, text, mediaType = 'text' }) {
-  const extraction = await extractGroceryItems(text, { senderName: fromName || fromPhone });
+  const extraction = await triageMessage(text, { senderName: fromName || fromPhone });
+  const by = fromName || fromPhone;
   let added = 0;
   for (const item of extraction.items) {
     const norm = normalizeName(item.name);
@@ -25,10 +26,20 @@ async function processMessage({ waMessageId = null, fromPhone, fromName, text, m
       await query(
         `INSERT INTO shopping_items (name, normalized_name, quantity, unit, category, source, added_by, urgency)
          VALUES ($1,$2,$3,$4,$5,'whatsapp',$6,$7)`,
-        [item.name, norm, item.quantity || 1, unit, item.category, fromName || fromPhone, item.urgency]
+        [item.name, norm, item.quantity || 1, unit, item.category, by, item.urgency]
       );
     }
     added++;
+  }
+  // To-do tasks captured from the same message; skip exact duplicates still open.
+  let tasksAdded = 0;
+  for (const t of extraction.tasks || []) {
+    const title = String(t.title || '').trim();
+    if (!title) continue;
+    const dupe = await query(`SELECT id FROM tasks WHERE done = false AND lower(title) = lower($1)`, [title]);
+    if (dupe.rows.length) continue;
+    await query(`INSERT INTO tasks (title, source, added_by) VALUES ($1,'whatsapp',$2)`, [title, by]);
+    tasksAdded++;
   }
   await query(
     `INSERT INTO whatsapp_messages (wa_message_id, from_phone, from_name, body, media_type, extracted, processed)
@@ -37,10 +48,12 @@ async function processMessage({ waMessageId = null, fromPhone, fromName, text, m
     [waMessageId, fromPhone || null, fromName || null, text, mediaType, JSON.stringify(extraction)]
   );
   const pendingCount = (await query(`SELECT COUNT(*)::int AS n FROM shopping_items WHERE status = 'pending'`)).rows[0].n;
-  const reply = extraction.is_grocery_message
-    ? `${extraction.reply} (list: ${pendingCount} items)`
-    : extraction.reply;
-  return { extraction, added, reply, pendingCount };
+  const openTasks = (await query(`SELECT COUNT(*)::int AS n FROM tasks WHERE done = false`)).rows[0].n;
+  const notes = [];
+  if (added) notes.push(`list: ${pendingCount} items`);
+  if (tasksAdded) notes.push(`${openTasks} to-dos`);
+  const reply = notes.length ? `${extraction.reply} (${notes.join(', ')})` : extraction.reply;
+  return { extraction, added, tasksAdded, reply, pendingCount, openTasks };
 }
 
 // Meta webhook verification handshake
