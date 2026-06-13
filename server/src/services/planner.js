@@ -46,7 +46,7 @@ const PLAN_SCHEMA = {
   additionalProperties: false
 };
 
-const SYSTEM = `You are the meal planner for a South African family of 6 (2 parents, 3 active teens, plus a domestic worker who sometimes joins lunch). You plan 7 dinners, Monday to Sunday.
+const SYSTEM = `You are the meal planner for a South African family of 6 (2 parents, 3 active teens, plus a domestic worker who sometimes joins lunch). You plan a rolling 7-day run of dinners. The run can start on ANY weekday — plan exactly the days you are given, in order, using their weekday names.
 
 Principles:
 - South African context: realistic Checkers/local supermarket ingredients and prices in Rand. Mix of SA classics (bobotie, potjie, braai, boerewors) and international meals.
@@ -55,7 +55,8 @@ Principles:
 - Honour the mood chips exactly (braai night, fish night, vegetarian night, one-pot, air fryer, use-up-the-freezer, leftover night, old favourites vs try-something-new).
 - Avoid the listed dislikes and allergies absolutely.
 - Ingredients must be shoppable: name them the way a supermarket product is named, with realistic pack-relevant quantities. Exclude pantry staples the family always has (salt, pepper, cooking oil) unless the recipe needs an unusual amount.
-- Sunday is the big family meal unless told otherwise.`;
+- If some days are already locked, those meals are fixed: do NOT plan or duplicate them — only fill the open days, and avoid repeating the locked meals.
+- The weekend / Sunday is the big family meal unless told otherwise.`;
 
 export async function generatePlan(context) {
   const stream = claude().messages.stream({
@@ -65,7 +66,7 @@ export async function generatePlan(context) {
     system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
     messages: [{
       role: 'user',
-      content: `Plan this week's 7 dinners.\n\nHousehold profile:\n${JSON.stringify(context.profile || {}, null, 2)}\n\nThis week's context (budget in Rand, schedule per night, mood chips, items already at home, recent meals to avoid repeating, favourites to consider):\n${JSON.stringify(context.week || {}, null, 2)}`
+      content: `Plan dinners for this 7-day run. Plan ONLY the days listed in "days_to_plan" (each with its date + weekday); copy nothing for the "locked_days" — those are already fixed and must not be repeated. Return one meal object per day you plan, keyed by its weekday name.\n\nHousehold profile:\n${JSON.stringify(context.profile || {}, null, 2)}\n\nThis run's context (the 7 dates, which days to plan vs locked, budget in Rand, schedule per weekday, mood chips, items already at home, recent meals to avoid repeating, favourites to consider):\n${JSON.stringify(context.week || {}, null, 2)}`
     }],
     output_config: { format: { type: 'json_schema', schema: PLAN_SCHEMA } },
   });

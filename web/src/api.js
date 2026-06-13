@@ -18,10 +18,35 @@ export const api = {
   del: path => request('DELETE', path),
 };
 
-/** Monday of the current week as YYYY-MM-DD. */
-export function currentWeekStart() {
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** Today as YYYY-MM-DD (local). Plans now start on any day, not just Monday. */
+export function todayISO() {
   const d = new Date();
-  const day = (d.getDay() + 6) % 7; // Mon=0
-  d.setDate(d.getDate() - day);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+/** Add n days to a YYYY-MM-DD string, returning YYYY-MM-DD (UTC-safe, no TZ drift). */
+export function addDays(iso, n) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Weekday name for a YYYY-MM-DD string. */
+export function weekdayOf(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+}
+
+/** The 7 days of a plan window: [{ date, weekday }, …] starting at startISO. */
+export function planWindow(startISO) {
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(startISO, i);
+    return { date, weekday: weekdayOf(date) };
+  });
+}
+
+/** Back-compat alias — start a plan from today rather than the Monday. */
+export const currentWeekStart = todayISO;

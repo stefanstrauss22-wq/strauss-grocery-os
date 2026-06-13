@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { api, currentWeekStart } from '../api.js';
+import { api, todayISO, addDays, planWindow } from '../api.js';
 import { foodArt } from '../foodArt.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const SHORT = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun' };
+const fmtDay = iso => new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
 const SLOT_STATES = ['normal', 'quick', 'off'];
 const SLOT_ICON = { normal: '🍳', quick: '⚡', off: '🚫' };
 const CHIPS = ['Braai night 🔥', 'Cheaper week 💸', 'Fish night 🐟', 'Vegetarian night 🥦', 'One-pot meals 🍲', 'Air fryer night', 'Use up the freezer 🧊', 'Leftover night ♻️', 'Old favourites ⭐', 'Try something new 🎲', 'Kid-friendly 🧒', 'No spicy food'];
 
 export default function PlanView() {
-  const [weekStart, setWeekStart] = useState(currentWeekStart());
+  const [weekStart, setWeekStart] = useState(todayISO());
+  const windowDays = planWindow(weekStart); // the 7 days of this run, in order
   const [plan, setPlan] = useState(null);
   const [budget, setBudget] = useState(2500);
   const [schedule, setSchedule] = useState(Object.fromEntries(DAYS.map(d => [d, 'normal'])));
@@ -110,19 +112,20 @@ export default function PlanView() {
       <div className="card">
         <h2>Weekly wizard</h2>
         <div className="grid cols2">
-          <label className="field">Week starting (Monday)
+          <label className="field">Plan starting
             <input type="date" value={weekStart} onChange={e => setWeekStart(e.target.value)} />
           </label>
           <label className="field">Budget: <b>R{budget}</b>
             <input type="range" min="1000" max="6000" step="100" value={budget} onChange={e => setBudget(Number(e.target.value))} />
           </label>
         </div>
+        <p className="muted" style={{ marginTop: -4 }}>7 days: {fmtDay(weekStart)} → {fmtDay(addDays(weekStart, 6))}</p>
         <h3>Schedule — tap a night: 🍳 normal → ⚡ quick (≤20 min) → 🚫 not cooking</h3>
         <div className="schedule-grid">
-          {DAYS.map((d, i) => <div key={d} className="day">{DAY_SHORT[i]}</div>)}
-          {DAYS.map(d => (
-            <button key={d} className={`slot ${schedule[d]}`} onClick={() => cycleSlot(d)} title={schedule[d]}>
-              {SLOT_ICON[schedule[d]]}
+          {windowDays.map(w => <div key={w.date} className="day">{SHORT[w.weekday]}</div>)}
+          {windowDays.map(w => (
+            <button key={w.date} className={`slot ${schedule[w.weekday]}`} onClick={() => cycleSlot(w.weekday)} title={schedule[w.weekday]}>
+              {SLOT_ICON[schedule[w.weekday]]}
             </button>
           ))}
         </div>
@@ -151,7 +154,7 @@ export default function PlanView() {
       {plan && (
         <div className="card">
           <div className="row">
-            <h2>Week of {new Date(plan.week_start).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })}</h2>
+            <h2>{fmtDay(plan.week_start)} → {fmtDay(addDays(plan.week_start, 6))}</h2>
             <div className="spacer" />
             <button className="primary" disabled={busy} onClick={toList}>Send ingredients to shopping list →</button>
           </div>
@@ -162,7 +165,7 @@ export default function PlanView() {
               return (
               <div key={meal.entry_id} className={`meal-card ${meal.locked ? 'locked' : ''}`}>
                 <div className="meal-art" style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
-                  <span className="day-pill">{meal.day_of_week}</span>
+                  <span className="day-pill">{meal.day_of_week}{meal.meal_date ? ` · ${fmtDay(meal.meal_date)}` : ''}</span>
                   {meal.locked && <span className="lock-pill">📌</span>}
                   <span className="emoji">{art.emoji}</span>
                 </div>

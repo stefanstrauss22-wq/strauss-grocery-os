@@ -5,6 +5,19 @@ import { consolidate, normalizeName } from '../services/consolidate.js';
 
 const router = express.Router();
 
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const isoDate = v => String(v).slice(0, 10);
+function addDays(iso, n) {
+  const [y, m, d] = isoDate(iso).split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
+}
+const weekdayOf = iso => WEEKDAYS[(() => { const [y, m, d] = isoDate(iso).split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); })()];
+// The 7 calendar days of a plan, starting at startISO (any weekday).
+const planWindow = startISO => Array.from({ length: 7 }, (_, i) => { const date = addDays(startISO, i); return { date, weekday: weekdayOf(date) }; });
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
 async function getSetting(key, fallback) {
   const { rows } = await query('SELECT value FROM settings WHERE key = $1', [key]);
   if (!rows.length) return fallback;
@@ -17,7 +30,7 @@ async function loadPlan(weekStart) {
   if (!planRows.rows.length) return null;
   const plan = planRows.rows[0];
   const entries = await query(`
-    SELECT e.id AS entry_id, e.day_of_week, e.locked, e.status AS entry_status, r.*
+    SELECT e.id AS entry_id, e.day_of_week, e.meal_date, e.locked, e.status AS entry_status, r.*
     FROM meal_plan_entries e LEFT JOIN recipes r ON r.id = e.recipe_id
     WHERE e.plan_id = $1`, [plan.id]);
   const order = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -28,7 +41,12 @@ async function loadPlan(weekStart) {
       : [];
     meals.push({ ...row, ingredients: ing });
   }
-  meals.sort((a, b) => order.indexOf(a.day_of_week) - order.indexOf(b.day_of_week));
+  // Order by actual date (rolling windows can start any day); fall back to the
+  // Mon–Sun order for older entries that predate meal_date.
+  meals.sort((a, b) => {
+    if (a.meal_date && b.meal_date) return isoDate(a.meal_date) < isoDate(b.meal_date) ? -1 : 1;
+    return order.indexOf(a.day_of_week) - order.indexOf(b.day_of_week);
+  });
   return { ...plan, meals };
 }
 
@@ -76,6 +94,12 @@ async function persistGeneratedPlan(weekStart, context, generated, { replaceDay 
         [planId, meal.day, recipeId]);
     }
   }
+  // Stamp every entry in the window with its calendar date (covers generated,
+  // swapped and locked-and-kept entries) so the plan renders in date order.
+  for (const w of planWindow(weekStart)) {
+    await query('UPDATE meal_plan_entries SET meal_date = $1 WHERE plan_id = $2 AND day_of_week = $3',
+      [w.date, planId, w.weekday]);
+  }
   return planId;
 }
 
@@ -95,8 +119,9 @@ async function setPlanStatus(weekStart, status, extra = {}) {
 router.post('/generate', async (req, res, next) => {
   try {
     const { week_start, week = {} } = req.body;
-    if (!week_start) return res.status(400).json({ error: 'week_start (Monday, YYYY-MM-DD) is required' });
+    if (!week_start) return res.status(400).json({ error: 'week_start (start date, YYYY-MM-DD) is required' });
 
+    const window = planWindow(week_start); // 7 days from the chosen start, any weekday
     const profile = await getSetting('household_profile', {});
     const ratings = await query(`
       SELECT r.title, SUM(m.rating)::int AS score, COUNT(*)::int AS votes
@@ -107,9 +132,23 @@ router.post('/generate', async (req, res, next) => {
       JOIN recipes r ON r.id = e.recipe_id
       JOIN meal_plans p ON p.id = e.plan_id
       WHERE p.week_start >= (DATE($1) - INTERVAL '21 days') AND p.week_start < DATE($1)`, [week_start]);
+    // Locked days in this window are kept verbatim — tell the planner so it fills
+    // only the open days and never duplicates a locked meal.
+    const lockedRows = await query(`
+      SELECT e.day_of_week, e.meal_date, r.title FROM meal_plan_entries e
+      JOIN meal_plans p ON p.id = e.plan_id LEFT JOIN recipes r ON r.id = e.recipe_id
+      WHERE p.week_start = $1 AND e.locked = true`, [week_start]);
+    const lockedDays = lockedRows.rows.map(r => r.day_of_week);
     const context = {
       profile,
-      week: { ...week, ratings: ratings.rows, recent_meals_to_avoid: recent.rows.map(r => r.title) },
+      week: {
+        ...week,
+        days: window,
+        days_to_plan: window.filter(w => !lockedDays.includes(w.weekday)),
+        locked_days: lockedRows.rows.map(r => ({ day: r.day_of_week, title: r.title })),
+        ratings: ratings.rows,
+        recent_meals_to_avoid: recent.rows.map(r => r.title),
+      },
     };
 
     await setPlanStatus(week_start, 'generating');
@@ -127,6 +166,18 @@ router.post('/generate', async (req, res, next) => {
         await query(`UPDATE meal_plans SET status = 'error' WHERE week_start = $1`, [week_start]).catch(() => {});
       }
     })();
+  } catch (e) { next(e); }
+});
+
+// GET /api/plan/current — the plan whose 7-day window covers today, else the latest.
+router.get('/current', async (req, res, next) => {
+  try {
+    const today = todayISO();
+    const { rows } = await query(`SELECT week_start FROM meal_plans WHERE status <> 'error' ORDER BY week_start DESC`);
+    if (!rows.length) return res.status(404).json({ error: 'no plans yet' });
+    const inWindow = rows.find(r => isoDate(r.week_start) <= today && today <= addDays(r.week_start, 6));
+    const plan = await loadPlan(isoDate((inWindow || rows[0]).week_start));
+    res.json(plan);
   } catch (e) { next(e); }
 });
 

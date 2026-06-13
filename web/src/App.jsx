@@ -3,6 +3,7 @@ import { api } from './api.js';
 import Dashboard from './views/Dashboard.jsx';
 import PlanView from './views/PlanView.jsx';
 import ListView from './views/ListView.jsx';
+import StaplesView from './views/StaplesView.jsx';
 import CartView from './views/CartView.jsx';
 import CatalogView from './views/CatalogView.jsx';
 import WhatsAppSim from './views/WhatsAppSim.jsx';
@@ -12,6 +13,7 @@ const TABS = [
   ['dashboard', '🏠', 'Home'],
   ['plan', '🍽️', 'Plan'],
   ['list', '🛒', 'List'],
+  ['staples', '🧺', 'Staples'],
   ['cart', '🤖', 'Cart'],
   ['catalog', '📦', 'Catalog'],
   ['whatsapp', '💬', 'Chat'],
@@ -61,6 +63,7 @@ export default function App() {
         {tab === 'dashboard' && <Dashboard goTo={setTab} />}
         {tab === 'plan' && <PlanView />}
         {tab === 'list' && <ListView />}
+        {tab === 'staples' && <StaplesView />}
         {tab === 'cart' && <CartView />}
         {tab === 'catalog' && <CatalogView />}
         {tab === 'whatsapp' && <WhatsAppSim />}

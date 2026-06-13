@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { api, currentWeekStart } from '../api.js';
-import { foodArt, dayShort, todayName } from '../foodArt.js';
+import { api, todayISO } from '../api.js';
+import { foodArt, dayShort } from '../foodArt.js';
 
-const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const isoDate = v => String(v).slice(0, 10);
 
 export default function Dashboard({ goTo }) {
   const [data, setData] = useState(null);
@@ -12,15 +12,16 @@ export default function Dashboard({ goTo }) {
 
   useEffect(() => {
     api.get('/dashboard').then(setData).catch(e => setErr(e.message));
-    api.get(`/plan/${currentWeekStart()}`).then(setPlan).catch(() => setPlan(null));
+    api.get('/plan/current').then(setPlan).catch(() => setPlan(null));
     api.get('/items?status=all').then(setItems).catch(() => {});
   }, []);
 
   if (err) return <div className="error-box">{err}</div>;
   if (!data) return <p className="muted">Setting the table…</p>;
 
-  const meals = plan?.meals || [];
-  const tonight = meals.find(m => m.day_of_week === todayName()) || meals[0];
+  const meals = plan?.meals || []; // server returns these in date order
+  const isToday = m => m.meal_date && isoDate(m.meal_date) === todayISO();
+  const tonight = meals.find(isToday) || meals[0];
   const art = tonight ? foodArt(tonight) : null;
 
   // Budget insight: planned cost vs the week's budget from the wizard
@@ -41,7 +42,7 @@ export default function Dashboard({ goTo }) {
       {tonight ? (
         <div className="hero">
           <div className="hero-art" style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
-            <span className="kicker">{tonight.day_of_week === todayName() ? "Tonight's dinner" : `${tonight.day_of_week}'s dinner`}</span>
+            <span className="kicker">{isToday(tonight) ? "Tonight's dinner" : `${tonight.day_of_week}'s dinner`}</span>
             <span className="emoji">{art.emoji}</span>
           </div>
           <div className="hero-body">
@@ -74,12 +75,11 @@ export default function Dashboard({ goTo }) {
         <div className="card">
           <h2>The week at a glance</h2>
           <div className="week-strip" style={{ marginTop: 10 }}>
-            {DAY_ORDER.map(day => {
-              const m = meals.find(x => x.day_of_week === day);
-              const a = m ? foodArt(m) : { emoji: '·' };
+            {meals.map(m => {
+              const a = foodArt(m);
               return (
-                <div key={day} className={`wday ${day === todayName() ? 'today' : ''}`} onClick={() => goTo('plan')} title={m?.title || ''}>
-                  <div className="d">{dayShort(day)}</div>
+                <div key={m.entry_id} className={`wday ${isToday(m) ? 'today' : ''}`} onClick={() => goTo('plan')} title={m?.title || ''}>
+                  <div className="d">{dayShort(m.day_of_week)}</div>
                   <div className="e">{a.emoji}</div>
                   <div className="t">{m?.title || '—'}</div>
                 </div>
