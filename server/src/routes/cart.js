@@ -32,6 +32,16 @@ router.get('/runs', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// DELETE /api/cart/runs — clear the run-history log (keeps any active
+// requested/running run). Cascades to cart_run_items. Purchase history and
+// the learned catalog are separate tables and are NOT touched.
+router.delete('/runs', async (req, res, next) => {
+  try {
+    const { rowCount } = await query(`DELETE FROM cart_runs WHERE status NOT IN ('requested','running')`);
+    res.json({ cleared: rowCount });
+  } catch (e) { next(e); }
+});
+
 // GET /api/cart/runs/:id  — run with its per-item results
 router.get('/runs/:id', async (req, res, next) => {
   try {

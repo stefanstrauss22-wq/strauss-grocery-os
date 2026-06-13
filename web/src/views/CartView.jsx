@@ -39,20 +39,6 @@ export default function CartView() {
     try { await api.patch(`/cart/run-items/${it.id}`, patch); } catch (e) { setErr(e.message); }
   }
 
-  const [orderText, setOrderText] = useState('');
-  const [importBusy, setImportBusy] = useState(false);
-  async function importOrder() {
-    if (!orderText.trim()) return;
-    setImportBusy(true); setErr(null);
-    try {
-      const r = await api.post('/orders/ingest', { text: orderText });
-      if (r.already) alert(`Order ${r.order_ref} was already imported. 👍`);
-      else alert(`✅ Imported ${r.items} products from your order.\n${r.purchased} ticked off the list, and the bot now knows these exact brands & prices for next time.`);
-      setOrderText('');
-    } catch (e) { setErr(e.message); }
-    setImportBusy(false);
-  }
-
   async function complete(id) {
     const res = await api.post(`/cart/runs/${id}/complete`, {});
     alert(`${res.purchased} items marked purchased and added to history. 🛵`);
@@ -61,6 +47,13 @@ export default function CartView() {
 
   async function showManual() {
     setManual(await api.get('/cart/manual'));
+  }
+
+  async function clearRuns() {
+    if (!confirm('Clear the cart run history? This removes the log of past robot runs only — your purchase history and the learned catalog are untouched.')) return;
+    setErr(null);
+    try { await api.del('/cart/runs'); setRun(null); loadRuns(); }
+    catch (e) { setErr(e.message); }
   }
 
   const summary = r => {
@@ -95,21 +88,6 @@ export default function CartView() {
         {err && <div className="error-box">{err}</div>}
       </div>
 
-      <div className="card">
-        <h2>📥 Import your Checkers order</h2>
-        <p className="lead">
-          After you pay, copy your order (or the Sixty60 invoice email) and paste it here. The bot reads
-          every line, ticks them off the list, and remembers the <b>exact brands, sizes &amp; prices</b> you
-          actually bought — so next week's pick gets it right with no guessing.
-        </p>
-        <textarea value={orderText} onChange={e => setOrderText(e.target.value)} placeholder={"Paste your Sixty60 order here, e.g.\nClover Butro 500g  Qty 1  R109.99\nBlue Ribbon Brown Bread 800g  Qty 2  R19.99\n…"} style={{ minHeight: 120 }} />
-        <div className="row" style={{ marginTop: 8 }}>
-          <button className="primary" disabled={importBusy} onClick={importOrder}>
-            {importBusy ? <span><span className="spinner">⏳</span> reading order…</span> : '📥 Import order'}
-          </button>
-        </div>
-      </div>
-
       {manual && (
         <div className="card">
           <h2>Manual mode — {manual.length} items</h2>
@@ -127,7 +105,11 @@ export default function CartView() {
       )}
 
       <div className="card">
-        <h2>Runs</h2>
+        <div className="row">
+          <h2>Runs</h2>
+          <div className="spacer" />
+          {runs.length > 0 && <button className="ghost tiny" onClick={clearRuns}>🗑 Clear history</button>}
+        </div>
         {!runs.length && <p className="muted">No cart runs yet.</p>}
         <table className="plain">
           <thead><tr><th>#</th><th>Started</th><th>Status</th><th>Added</th><th>Review</th><th>Est. total</th><th></th></tr></thead>
