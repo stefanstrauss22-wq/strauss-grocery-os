@@ -20,6 +20,33 @@ export function normalizeUnit(unit) {
   return UNIT_ALIASES[u] || u;
 }
 
+// Cooking measures you can't actually buy — a recipe needs "3 tbsp curry powder"
+// but the shop sells a jar, not a tablespoon. These collapse to one pack.
+const MEASURING_UNITS = new Set([
+  'tbsp', 'tablespoon', 'tablespoons',
+  'tsp', 'teaspoon', 'teaspoons',
+  'cup', 'cups',
+  'pinch', 'pinches', 'dash', 'splash', 'drizzle', 'knob', 'handful',
+  'clove', 'cloves', 'sprig', 'sprigs', 'stalk', 'stalks',
+  'slice', 'slices', 'stick', 'sticks', 'piece', 'pieces',
+]);
+
+/**
+ * Turn a recipe-style amount into something you can put in a trolley.
+ * Cooking measures (tbsp, tsp, cloves…) and tiny g/ml amounts (spices, pastes,
+ * essences) become a single pack — you buy one jar, not three tablespoons.
+ * Real purchase amounts (kg, litres, packs, dozens, sensible g/ml, counts) are
+ * kept; loose counts are rounded up to a whole item.
+ */
+export function shoppableQuantity({ quantity, unit }) {
+  const u = normalizeUnit(unit);
+  const q = Number(quantity) || 1;
+  if (u && MEASURING_UNITS.has(u)) return { quantity: 1, unit: null };
+  if ((u === 'g' || u === 'ml') && q < 100) return { quantity: 1, unit: null };
+  if (!u || u === 'each') return { quantity: Math.max(1, Math.ceil(q)), unit: u || null };
+  return { quantity: q, unit: u };
+}
+
 /**
  * Merge a list of {name, quantity, unit, category, ...} into consolidated entries.
  * Quantities sum when units match; otherwise entries are kept separate per unit.

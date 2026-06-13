@@ -1,7 +1,7 @@
 import express from 'express';
 import { query } from '../db/db.js';
 import { generatePlan, swapMeal } from '../services/planner.js';
-import { consolidate, normalizeName } from '../services/consolidate.js';
+import { consolidate, normalizeName, shoppableQuantity } from '../services/consolidate.js';
 
 const router = express.Router();
 
@@ -251,19 +251,24 @@ router.post('/:weekStart/to-list', async (req, res, next) => {
     const merged = consolidate(allIngredients);
     let added = 0, mergedCount = 0;
     for (const item of merged) {
+      // Recipe amounts → shoppable amounts (no "3 tablespoons of curry").
+      const { quantity, unit } = shoppableQuantity(item);
       const existing = await query(
         `SELECT id, quantity FROM shopping_items WHERE normalized_name = $1 AND status = 'pending' AND (unit IS NOT DISTINCT FROM $2)`,
-        [item.normalized_name, item.unit]
+        [item.normalized_name, unit]
       );
       if (existing.rows.length) {
-        await query('UPDATE shopping_items SET quantity = quantity + $1, updated_at = now() WHERE id = $2',
-          [item.quantity, existing.rows[0].id]);
+        // Pack-style items (no unit) don't accumulate — one jar covers the week.
+        if (unit !== null) {
+          await query('UPDATE shopping_items SET quantity = quantity + $1, updated_at = now() WHERE id = $2',
+            [quantity, existing.rows[0].id]);
+        }
         mergedCount++;
       } else {
         await query(
           `INSERT INTO shopping_items (name, normalized_name, quantity, unit, category, source)
            VALUES ($1,$2,$3,$4,$5,'meal_plan')`,
-          [item.name, item.normalized_name, item.quantity, item.unit, item.category]
+          [item.name, item.normalized_name, quantity, unit, item.category]
         );
         added++;
       }
