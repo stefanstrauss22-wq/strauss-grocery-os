@@ -12,6 +12,10 @@ async function init() {
   if (_impl) return _impl;
   if (config.databaseUrl) {
     const { default: pg } = await import('pg');
+    // Keep DATE (oid 1082) as a plain 'YYYY-MM-DD' string instead of a JS Date.
+    // pg's default Date parsing causes timezone drift and breaks our string-based
+    // date math; this also matches PGlite, so both backends behave identically.
+    pg.types.setTypeParser(1082, v => v);
     const ssl = /supabase|amazonaws|railway/.test(config.databaseUrl)
       ? { rejectUnauthorized: false }
       : undefined;
