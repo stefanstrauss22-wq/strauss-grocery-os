@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { useLang } from './i18n.jsx';
+import SpensIcon from './components/SpensIcon.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import PlanView from './views/PlanView.jsx';
 import ListView from './views/ListView.jsx';
@@ -42,9 +43,12 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div>
-          <h1>{greeting(tr)}, {tr('Strauss family', 'Strauss-gesin')} 🧑‍🍳</h1>
-          <div className="sub">{tr("What's cooking this week?", 'Wat kook ons hierdie week?')}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <SpensIcon size={42} title="Spens" />
+          <div>
+            <h1>{greeting(tr)}, {tr('Strauss family', 'Strauss-gesin')} 🧑‍🍳</h1>
+            <div className="sub">{tr("What's cooking this week?", 'Wat kook ons hierdie week?')}</div>
+          </div>
         </div>
         <div className="badges">
           <div className="lang-toggle" role="group" aria-label="Language">
