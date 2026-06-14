@@ -11,7 +11,10 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
-const SYSTEM = 'You translate English UI text, recipe titles/descriptions/cooking steps, and grocery ingredient names into natural South African Afrikaans for a family meal-planning app. You are given a JSON array of English strings. Return a "translations" array of the SAME LENGTH and SAME ORDER, each being the Afrikaans translation of the input at that position. Translate meaning faithfully and concisely; keep numbers, measurements/units and brand names unchanged.';
+// Glossary of food terms the model tends to get wrong — extend as needed.
+const GLOSSARY = 'GLOSSARY (use these Afrikaans forms exactly): meatball = frikkadel, plural frikkadelle (NEVER "frikkadels"); leek = prei, plural preie.';
+
+const SYSTEM = `You translate English UI text, recipe titles/descriptions/cooking steps, and grocery ingredient names into natural South African Afrikaans for a family meal-planning app. You are given a JSON array of English strings. Return a "translations" array of the SAME LENGTH and SAME ORDER, each being the Afrikaans translation of the input at that position. Translate meaning faithfully and concisely; keep numbers, measurements/units and brand names unchanged.\n\n${GLOSSARY}`;
 
 async function translateBatch(strings) {
   const msg = await claude().messages.create({
