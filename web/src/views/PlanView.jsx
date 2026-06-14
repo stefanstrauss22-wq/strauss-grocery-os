@@ -24,7 +24,19 @@ export default function PlanView() {
   const [swapping, setSwapping] = useState(null);
 
   const loadPlan = ws => api.get(`/plan/${ws}`).then(setPlan).catch(() => setPlan(null));
-  useEffect(() => { loadPlan(weekStart); }, [weekStart]);
+
+  // On first load, show the CURRENT rolling plan — the one whose 7-day window
+  // covers today — and sync the date picker to its actual start date. A plan
+  // can start on any day, so an exact `/plan/{today}` match misses the day
+  // after it starts and the section looks empty.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    api.get('/plan/current')
+      .then(p => { if (p?.week_start) setWeekStart(String(p.week_start).slice(0, 10)); })
+      .catch(() => {})
+      .finally(() => setReady(true));
+  }, []);
+  useEffect(() => { if (ready) loadPlan(weekStart); }, [weekStart, ready]);
 
   // Generation/swap runs in the background on the server; poll the plan until
   // its status flips away from 'generating'. Resolves with the finished plan.
