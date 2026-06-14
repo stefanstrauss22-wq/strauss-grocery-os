@@ -7,6 +7,7 @@ import { aiEnabled } from './services/claude.js';
 import itemsRouter from './routes/items.js';
 import staplesRouter from './routes/staples.js';
 import tasksRouter from './routes/tasks.js';
+import translateRouter from './routes/translate.js';
 import planRouter from './routes/plan.js';
 import catalogRouter from './routes/catalog.js';
 import whatsappRouter from './routes/whatsapp.js';
@@ -48,6 +49,7 @@ app.get('/api/dashboard', async (req, res, next) => {
 app.use('/api/items', itemsRouter);
 app.use('/api/staples', staplesRouter);
 app.use('/api/tasks', tasksRouter);
+app.use('/api/translate', translateRouter);
 app.use('/api/plan', planRouter);
 app.use('/api/catalog', catalogRouter);
 app.use('/api/whatsapp', whatsappRouter);

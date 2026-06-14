@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api, todayISO } from '../api.js';
 import { foodArt } from '../foodArt.js';
 import TodoList from './TodoList.jsx';
-import { useLang } from '../i18n.jsx';
+import { useLang, useAutoTranslate } from '../i18n.jsx';
 
 const isoDate = v => String(v).slice(0, 10);
 
@@ -20,6 +20,10 @@ export default function Dashboard({ goTo }) {
     api.get('/plan/current').then(setPlan).catch(() => setPlan(null));
     api.get('/items?status=all').then(setItems).catch(() => {});
   }, []);
+
+  // Translate recipe text + ingredient names for display (data stays English).
+  const tx = useAutoTranslate((plan?.meals || []).flatMap(m =>
+    [m.title, m.description, m.instructions, ...((m.ingredients || []).map(i => i.name))]));
 
   if (err) return <div className="error-box">{err}</div>;
   if (!data) return <p className="muted">{tr('Setting the table…', 'Ons dek die tafel…')}</p>;
@@ -53,8 +57,8 @@ export default function Dashboard({ goTo }) {
             <span className="emoji">{art.emoji}</span>
           </div>
           <div className="hero-body">
-            <h2>{selected.title}</h2>
-            <p>{selected.description}</p>
+            <h2>{tx(selected.title)}</h2>
+            <p>{tx(selected.description)}</p>
             <div className="row">
               <span className="tag">⏱ {(selected.prep_minutes || 0) + (selected.cook_minutes || 0)} min</span>
               <span className="tag terra">💰 ~R{Math.round((selected.est_cost_cents || 0) / 100)}</span>
@@ -71,7 +75,7 @@ export default function Dashboard({ goTo }) {
                     <h4 style={{ margin: '0 0 6px' }}>{tr('Ingredients', 'Bestanddele')}</h4>
                     <ul className="muted" style={{ paddingLeft: 18, margin: '0 0 12px' }}>
                       {selected.ingredients.map((ing, i) => (
-                        <li key={i}>{Number(ing.quantity)} {ing.unit || ''} {ing.name}</li>
+                        <li key={i}>{Number(ing.quantity)} {ing.unit || ''} {tx(ing.name)}</li>
                       ))}
                     </ul>
                   </>
@@ -79,7 +83,7 @@ export default function Dashboard({ goTo }) {
                 {selected.instructions && (
                   <>
                     <h4 style={{ margin: '0 0 6px' }}>{tr('Method', 'Metode')}</h4>
-                    <p className="muted" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{selected.instructions}</p>
+                    <p className="muted" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{tx(selected.instructions)}</p>
                   </>
                 )}
                 {!selected.ingredients?.length && !selected.instructions && (
@@ -115,7 +119,7 @@ export default function Dashboard({ goTo }) {
                 <div key={m.entry_id} className={`wday ${isSel ? 'today' : ''}`} onClick={() => setSelectedId(m.entry_id)} title={m?.title || ''}>
                   <div className="d">{dayShort(m.day_of_week)}</div>
                   <div className="e">{a.emoji}</div>
-                  <div className="t">{m?.title || '—'}</div>
+                  <div className="t">{m?.title ? tx(m.title) : '—'}</div>
                 </div>
               );
             })}

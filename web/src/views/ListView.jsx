@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { useLang } from '../i18n.jsx';
+import { useLang, useAutoTranslate } from '../i18n.jsx';
 
 // The list is grouped by where each item came FROM first; type is a secondary tag.
 const SOURCE_ORDER = ['whatsapp', 'meal_plan', 'staples', 'manual', 'predicted', 'other'];
@@ -21,6 +21,7 @@ const CATEGORY_ORDER = ['produce', 'meat', 'dairy', 'bakery', 'pantry', 'frozen'
 export default function ListView() {
   const { tr } = useLang();
   const [items, setItems] = useState([]);
+  const tx = useAutoTranslate(items.map(i => i.name)); // display item names in AF (data stays English)
   const [newItem, setNewItem] = useState('');
   const [selected, setSelected] = useState(() => new Set());
   const [err, setErr] = useState(null);
@@ -120,7 +121,7 @@ export default function ListView() {
                   <span className="name">
                     {item.urgency === 'urgent' && '❗'}
                     <span title={item.category}>{CATEGORY_ICON[item.category] || '📦'}</span>{' '}
-                    {item.name}
+                    {tx(item.name)}
                     {item.added_by ? <span className="muted"> — {item.added_by}</span> : null}
                   </span>
                   <span className="qty">{Number(item.quantity)}{item.unit ? ` ${item.unit}` : '×'}</span>

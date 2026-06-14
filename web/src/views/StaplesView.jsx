@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { useLang } from '../i18n.jsx';
+import { useLang, useAutoTranslate } from '../i18n.jsx';
 
 const CATEGORY_ICON = { produce: '🥕', meat: '🥩', dairy: '🥛', bakery: '🍞', pantry: '🥫', frozen: '🧊', household: '🧴', toiletries: '🧻', pet: '🐶', other: '📦' };
 const KIND_LABEL = { fixed: 'staple', rotation: 'rotation', custom: 'added', learned: 'suggested' };
@@ -9,6 +9,7 @@ const KIND_ORDER = ['fixed', 'rotation', 'learned', 'custom'];
 export default function StaplesView() {
   const { tr } = useLang();
   const [staples, setStaples] = useState([]);
+  const tx = useAutoTranslate(staples.map(s => s.name)); // display staple names in AF (data stays English)
   const [newItem, setNewItem] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -102,7 +103,7 @@ export default function StaplesView() {
               <li key={s.id} className={s.active ? '' : 'muted'}>
                 <input type="checkbox" checked={s.active} onChange={() => toggle(s)} title={tr('Include in the order', 'Sluit in die bestelling in')} />
                 <span className="name">
-                  <span title={s.category}>{CATEGORY_ICON[s.category] || '📦'}</span> {s.name}
+                  <span title={s.category}>{CATEGORY_ICON[s.category] || '📦'}</span> {tx(s.name)}
                   {s.note ? <span className="muted"> — {s.note}</span> : null}
                 </span>
                 <input

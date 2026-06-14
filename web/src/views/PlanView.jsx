@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, todayISO, addDays, planWindow } from '../api.js';
 import { foodArt } from '../foodArt.js';
-import { useLang } from '../i18n.jsx';
+import { useLang, useAutoTranslate } from '../i18n.jsx';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const fmtDay = (iso, locale = 'en-ZA') => new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
@@ -39,6 +39,9 @@ export default function PlanView() {
   const [err, setErr] = useState(null);
   const [summary, setSummary] = useState(null);
   const [swapping, setSwapping] = useState(null);
+  // Translate recipe text + ingredient names for display (data stays English).
+  const tx = useAutoTranslate((plan?.meals || []).flatMap(m =>
+    [m.title, m.description, m.instructions, ...((m.ingredients || []).map(i => i.name))]));
 
   // Show the plan for the selected start date; if none exists there yet, fall
   // back to the current rolling plan so the active week stays visible. The date
@@ -198,8 +201,8 @@ export default function PlanView() {
                   <span className="emoji">{art.emoji}</span>
                 </div>
                 <div className="meal-body">
-                <h3>{meal.title || '—'}</h3>
-                <p className="desc">{meal.description}</p>
+                <h3>{meal.title ? tx(meal.title) : '—'}</h3>
+                <p className="desc">{tx(meal.description)}</p>
                 <div style={{ marginBottom: 6 }}>
                   {meal.cuisine && <span className="tag gold">{meal.cuisine}</span>}
                   {tags.slice(0, 3).map(t => <span key={t} className="tag">{t}</span>)}
@@ -214,10 +217,10 @@ export default function PlanView() {
                     <summary>{tr('Recipe & ingredients', 'Resep & bestanddele')}</summary>
                     <ul className="muted" style={{ paddingLeft: 18 }}>
                       {meal.ingredients.map((ing, i) => (
-                        <li key={i}>{ing.quantity} {ing.unit || ''} {ing.name}</li>
+                        <li key={i}>{ing.quantity} {ing.unit || ''} {tx(ing.name)}</li>
                       ))}
                     </ul>
-                    <p className="muted" style={{ whiteSpace: 'pre-wrap' }}>{meal.instructions}</p>
+                    <p className="muted" style={{ whiteSpace: 'pre-wrap' }}>{tx(meal.instructions)}</p>
                   </details>
                 )}
                 <div className="actions">
