@@ -6,6 +6,8 @@ import { useLang, useAutoTranslate, ingredientEnglish } from '../i18n.jsx';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const fmtDay = (iso, locale = 'en-ZA') => new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+// tags is stored as a JSON array (sometimes as a JSON string) — normalise to an array.
+const parseTags = t => (Array.isArray(t) ? t : (() => { try { return JSON.parse(t || '[]'); } catch { return []; } })()) || [];
 
 export default function PlanView() {
   const { tr, locale, lang, dayShort, dayLong } = useLang();
@@ -46,9 +48,11 @@ export default function PlanView() {
   const [err, setErr] = useState(null);
   const [summary, setSummary] = useState(null);
   const [swapping, setSwapping] = useState(null);
-  // Translate recipe text + ingredient names for display (data stays English).
+  // Translate recipe text + cuisine + tags + ingredient names for display
+  // (stored data stays English / as generated).
   const tx = useAutoTranslate((plan?.meals || []).flatMap(m =>
-    [m.title, m.description, m.instructions, ...((m.ingredients || []).map(ingredientEnglish))]));
+    [m.title, m.description, m.instructions, m.cuisine, ...parseTags(m.tags),
+     ...((m.ingredients || []).map(ingredientEnglish))]));
 
   // Show the plan for the selected start date; if none exists there yet, fall
   // back to the current rolling plan so the active week stays visible. The date
@@ -207,7 +211,7 @@ export default function PlanView() {
           <div className="grid cols2" style={{ marginTop: 10 }}>
             {plan.meals.map(meal => {
               const art = foodArt(meal);
-              const tags = (typeof meal.tags === 'string' ? JSON.parse(meal.tags || '[]') : meal.tags) || [];
+              const tags = parseTags(meal.tags);
               return (
               <div key={meal.entry_id} className={`meal-card ${meal.locked ? 'locked' : ''}`}>
                 <div className="meal-art" style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
@@ -219,8 +223,8 @@ export default function PlanView() {
                 <h3>{meal.title ? tx(meal.title) : '—'}</h3>
                 <p className="desc">{tx(meal.description)}</p>
                 <div style={{ marginBottom: 6 }}>
-                  {meal.cuisine && <span className="tag gold">{meal.cuisine}</span>}
-                  {tags.slice(0, 3).map(t => <span key={t} className="tag">{t}</span>)}
+                  {meal.cuisine && <span className="tag gold">{tx(meal.cuisine)}</span>}
+                  {tags.slice(0, 3).map(t => <span key={t} className="tag">{tx(t)}</span>)}
                 </div>
                 <div className="meta">
                   <span>⏱ {(meal.prep_minutes || 0) + (meal.cook_minutes || 0)} min</span>

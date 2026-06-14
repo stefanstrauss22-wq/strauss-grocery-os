@@ -22,9 +22,9 @@ export default function Dashboard({ goTo }) {
     api.get('/items?status=all').then(setItems).catch(() => {});
   }, []);
 
-  // Translate recipe text + ingredient names for display (data stays English).
+  // Translate recipe text + cuisine + ingredient names for display (data stays English).
   const tx = useAutoTranslate((plan?.meals || []).flatMap(m =>
-    [m.title, m.description, m.instructions, ...((m.ingredients || []).map(ingredientEnglish))]));
+    [m.title, m.description, m.instructions, m.cuisine, ...((m.ingredients || []).map(ingredientEnglish))]));
 
   if (err) return <div className="error-box">{err}</div>;
   if (!data) return <p className="muted">{tr('Setting the table…', 'Ons dek die tafel…')}</p>;
@@ -64,7 +64,7 @@ export default function Dashboard({ goTo }) {
               <span className="tag">⏱ {(selected.prep_minutes || 0) + (selected.cook_minutes || 0)} min</span>
               <span className="tag terra">💰 ~R{Math.round((selected.est_cost_cents || 0) / 100)}</span>
               {selected.calories_kcal != null && <span className="tag">🔥 {selected.calories_kcal} kcal</span>}
-              {selected.cuisine && <span className="tag gold">{selected.cuisine}</span>}
+              {selected.cuisine && <span className="tag gold">{tx(selected.cuisine)}</span>}
               <div className="spacer" />
               <button className="ghost" onClick={() => setShowRecipe(v => !v)}>
                 {showRecipe ? tr('Hide recipe ▲', 'Versteek resep ▲') : tr('See the recipe →', 'Sien die resep →')}
