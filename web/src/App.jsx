@@ -23,14 +23,6 @@ const TABS = [
   ['settings', '⚙️', 'Settings', 'Instellings'],
 ];
 
-function greeting(tr) {
-  const h = new Date().getHours();
-  if (h < 5) return tr('Up late', 'Laat op');
-  if (h < 12) return tr('Good morning', 'Goeiemôre');
-  if (h < 17) return tr('Good afternoon', 'Goeiemiddag');
-  return tr('Good evening', 'Goeienaand');
-}
-
 export default function App() {
   const [tab, setTab] = useState('dashboard');
   const [health, setHealth] = useState(null);
@@ -46,7 +38,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <SpensIcon size={42} title="Spens" />
           <div>
-            <h1>{greeting(tr)}, {tr('Strauss family', 'Strauss-gesin')} 🧑‍🍳</h1>
+            <h1>{tr('Morning Strausses!', 'Môre Strausse!')}</h1>
             <div className="sub">{tr("What's cooking this week?", 'Wat kook ons hierdie week?')}</div>
           </div>
         </div>
