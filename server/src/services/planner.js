@@ -12,6 +12,7 @@ const PLAN_SCHEMA = {
         type: 'object',
         properties: {
           day: { type: 'string', enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
+          meal_type: { type: 'string', enum: ['breakfast', 'lunch', 'dinner'] },
           title: { type: 'string' },
           description: { type: 'string', description: '1-2 sentences selling the meal to the family' },
           cuisine: { type: 'string' },
@@ -49,7 +50,7 @@ const PLAN_SCHEMA = {
             }
           }
         },
-        required: ['day', 'title', 'description', 'cuisine', 'prep_minutes', 'cook_minutes', 'servings', 'tags', 'est_cost_rand', 'nutrition', 'instructions', 'ingredients'],
+        required: ['day', 'meal_type', 'title', 'description', 'cuisine', 'prep_minutes', 'cook_minutes', 'servings', 'tags', 'est_cost_rand', 'nutrition', 'instructions', 'ingredients'],
         additionalProperties: false
       }
     },
@@ -59,25 +60,30 @@ const PLAN_SCHEMA = {
   additionalProperties: false
 };
 
-const SYSTEM = `You are the meal planner for a South African family of 6 (2 parents, 3 active teens, plus a domestic worker who sometimes joins lunch). You plan a rolling run of dinners (anywhere from 3 to 7 nights). The run can start on ANY weekday — plan exactly the days you are given, in order, using their weekday names.
+const SYSTEM = `You are the meal planner for a South African family of 6 (2 parents, 3 active teens, plus a domestic worker who sometimes joins lunch). You plan meals for a rolling run of days (3 to 7 days), starting on ANY weekday. For each day you may be asked for breakfast, lunch and/or dinner. Plan EXACTLY the meals listed in "to_plan" — one meal object per item, each carrying its weekday ("day") and its "meal_type".
 
 Principles:
-- South African context: realistic Checkers/local supermarket ingredients and prices in Rand. Mix of SA classics (bobotie, potjie, braai, boerewors) and international meals.
-- Respect each night's setting in "schedule" (one value per weekday) exactly:
-  - "normal" — a standard dinner.
-  - "quick" — must need <= 20 min active time.
-  - "braai" — a South African braai / grill meal (boerewors, sosaties, lamb chops, steak, braai broodjies).
-  - "fish" — a fish or seafood main.
+- South African context: realistic Checkers/local supermarket ingredients and prices in Rand. Mix of SA classics (bobotie, potjie, braai, boerewors, pap) and international meals.
+- Make each meal fit its meal_type:
+  - "breakfast" — a morning meal (eggs, oats, yoghurt & granola, toast, breakfast wraps, smoothies). Usually quick and lighter; smaller portions and lower cost than dinner.
+  - "lunch" — a lighter midday meal: sandwiches, salads, wraps, soups, leftovers, lunchbox-friendly options.
+  - "dinner" — the main meal of the day.
+- Respect each meal's "style" exactly:
+  - "normal" — a standard meal for that meal_type.
+  - "quick" — must need <= 20 min active time (<= 10 min for breakfast).
+  - "braai" — a South African braai / grill meal (boerewors, sosaties, lamb chops, steak, braai broodjies). [dinner]
+  - "fish" — a fish or seafood main. [dinner/lunch]
   - "air_fryer" — a meal built around the air fryer.
   - "leftover" — use up leftovers, minimal effort; keep the ingredient list empty or very small.
-  - "off" — not cooking: a no-cook fallback (leftovers, toasted sandwiches, takeaway note) with an empty ingredient list.
+  - "off" — not eating in / skipping: a no-cook fallback with an empty ingredient list.
 - Respect the budget: keep the week's total estimated ingredient cost within the stated budget. Use cheaper cuts and seasonal produce when budget is tight.
 - Honour the mood chips exactly (cheaper week, one-pot, use up the freezer, old favourites vs try-something-new, kid-friendly, no spicy food).
 - Avoid the listed dislikes and allergies absolutely.
 - Ingredients must be shoppable: name them the way a supermarket product is named, with realistic pack-relevant quantities. Exclude pantry staples the family always has (salt, pepper, cooking oil) unless the recipe needs an unusual amount.
 - Give honest per-serving nutrition (calories, protein, carbs, fat, fibre) for a single plated portion at the stated servings — not the whole pot. For a no-cook / "off" night with no real meal, use small or zero values.
-- If some days are already locked, those meals are fixed: do NOT plan or duplicate them — only fill the open days, and avoid repeating the locked meals.
-- The weekend / Sunday is the big family meal unless told otherwise.`;
+- Some meals may already be locked ("locked_meals", each a day + meal_type): those are fixed — do NOT plan or duplicate them, and avoid repeating them.
+- Vary meals across the run: do not repeat the same dish, and avoid clashing a heavy lunch with a heavy dinner on the same day.
+- The weekend / Sunday is the big family dinner unless told otherwise.`;
 
 // Recipes are ALWAYS authored and stored in English (canonical). Afrikaans is
 // produced at display time by the /api/translate layer and cached, so both
@@ -91,15 +97,17 @@ function languageInstruction() {
 }
 
 export async function generatePlan(context) {
-  const numDays = (context.week?.days?.length) || 7;
+  const toPlan = context.week?.to_plan || [];
+  // Headroom for up to 7 days x 3 meals; scale with the work list.
+  const maxTokens = Math.min(64000, 12000 + toPlan.length * 2200);
   const stream = claude().messages.stream({
     model: config.plannerModel,
-    max_tokens: 32000,
+    max_tokens: maxTokens,
     thinking: { type: 'adaptive' },
     system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
     messages: [{
       role: 'user',
-      content: `Plan dinners for this ${numDays}-day run. Plan ONLY the days listed in "days_to_plan" (each with its date + weekday); copy nothing for the "locked_days" — those are already fixed and must not be repeated. Return one meal object per day you plan, keyed by its weekday name.\n\nHousehold profile:\n${JSON.stringify(context.profile || {}, null, 2)}\n\nThis run's context (the ${numDays} dates, which days to plan vs locked, budget in Rand, schedule per weekday, mood chips, items already at home, recent meals to avoid repeating, favourites to consider):\n${JSON.stringify(context.week || {}, null, 2)}${languageInstruction(context)}`
+      content: `Plan exactly the ${toPlan.length} meals in "to_plan" — each item gives a date, weekday, meal_type and style. Return one meal object per item, carrying its weekday ("day") and "meal_type". Do NOT plan anything in "locked_meals"; those are fixed and must not be repeated.\n\nHousehold profile:\n${JSON.stringify(context.profile || {}, null, 2)}\n\nThis run's context (the meals to plan, locked meals, budget in Rand, mood chips, items already at home, recent meals to avoid repeating, favourites to consider):\n${JSON.stringify(context.week || {}, null, 2)}${languageInstruction(context)}`
     }],
     output_config: { format: { type: 'json_schema', schema: PLAN_SCHEMA } },
   });
@@ -107,8 +115,9 @@ export async function generatePlan(context) {
   return JSON.parse(firstText(message));
 }
 
-/** Regenerate a single meal slot, keeping the rest of the week fixed. */
-export async function swapMeal(context, currentPlan, day, reason) {
+/** Regenerate a single meal slot (one day + meal_type), keeping the rest fixed.
+ *  Returns a plan object whose `meals` array holds just the one replacement. */
+export async function swapMeal(context, currentPlan, day, mealType, reason) {
   const stream = claude().messages.stream({
     model: config.plannerModel,
     max_tokens: 16000,
@@ -116,7 +125,7 @@ export async function swapMeal(context, currentPlan, day, reason) {
     system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
     messages: [{
       role: 'user',
-      content: `Here is the current week plan:\n${JSON.stringify(currentPlan, null, 2)}\n\nReplace ONLY the meal for ${day}. Reason for the swap: "${reason || 'family wants something different'}".\nThe replacement must not duplicate any other meal this week and must satisfy the same constraints:\n${JSON.stringify(context, null, 2)}\n\nReturn a full plan object but change only the ${day} entry; copy the other days through unchanged.${languageInstruction(context)}`
+      content: `Here is the current plan (for context — do not repeat any of these dishes):\n${JSON.stringify(currentPlan, null, 2)}\n\nReplace ONLY the ${mealType} for ${day}. Reason for the swap: "${reason || 'family wants something different'}".\nThe replacement must not duplicate any other meal in the plan and must satisfy the same constraints:\n${JSON.stringify(context, null, 2)}\n\nReturn a plan object whose "meals" array contains EXACTLY ONE meal object — the new ${mealType} for ${day} (with day="${day}" and meal_type="${mealType}").${languageInstruction(context)}`
     }],
     output_config: { format: { type: 'json_schema', schema: PLAN_SCHEMA } },
   });

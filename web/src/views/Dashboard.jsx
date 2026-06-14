@@ -29,17 +29,27 @@ export default function Dashboard({ goTo }) {
   if (err) return <div className="error-box">{err}</div>;
   if (!data) return <p className="muted">{tr('Setting the table…', 'Ons dek die tafel…')}</p>;
 
-  const meals = plan?.meals || []; // server returns these in date order
+  const allMeals = plan?.meals || []; // server returns these date- then slot-ordered
   const isToday = m => m.meal_date && isoDate(m.meal_date) === todayISO();
-  const todayMeal = meals.find(isToday) || meals[0];
+  // A plan can hold breakfast/lunch/dinner per day — for the hero and the strip
+  // we show one representative meal per day (prefer dinner, then lunch).
+  const mealRank = m => ({ dinner: 3, lunch: 2, breakfast: 1 }[m?.meal_type || 'dinner'] || 0);
+  const repByDate = {};
+  for (const m of allMeals) {
+    const k = m.meal_date ? isoDate(m.meal_date) : m.day_of_week;
+    if (!repByDate[k] || mealRank(m) > mealRank(repByDate[k])) repByDate[k] = m;
+  }
+  const dayMeals = Object.values(repByDate); // one per day, in date order
+  const MEAL_LABEL = { breakfast: tr('breakfast', 'ontbyt'), lunch: tr('lunch', 'middagete'), dinner: tr('dinner', 'aandete') };
+  const todayMeal = dayMeals.find(isToday) || dayMeals[0];
   // The hero shows today's meal by default, or whichever day you tap in the strip.
-  const selected = meals.find(m => m.entry_id === selectedId) || todayMeal;
+  const selected = allMeals.find(m => m.entry_id === selectedId) || todayMeal;
   const art = selected ? foodArt(selected) : null;
 
   // Budget insight: planned cost vs the week's budget from the wizard
   const ctx = plan ? (typeof plan.context === 'string' ? JSON.parse(plan.context) : plan.context) : null;
   const budget = ctx?.week?.budget_rand || null;
-  const plannedRand = Math.round(meals.reduce((s, m) => s + (m.est_cost_cents || 0), 0) / 100);
+  const plannedRand = Math.round(allMeals.reduce((s, m) => s + (m.est_cost_cents || 0), 0) / 100);
 
   // Shopping progress: this list cycle
   const pending = items.filter(i => i.status === 'pending').length;
@@ -54,7 +64,11 @@ export default function Dashboard({ goTo }) {
       {selected ? (
         <div className="hero">
           <div className="hero-art" style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
-            <span className="kicker">{isToday(selected) ? tr("Tonight's dinner", 'Vanaand se aandete') : tr(`${selected.day_of_week}'s dinner`, `${dayLong(selected.day_of_week)} se aandete`)}</span>
+            <span className="kicker">{(() => {
+              const mt = selected.meal_type || 'dinner';
+              if (isToday(selected)) return mt === 'dinner' ? tr("Tonight's dinner", 'Vanaand se aandete') : tr(`Today's ${MEAL_LABEL[mt]}`, `Vandag se ${MEAL_LABEL[mt]}`);
+              return tr(`${selected.day_of_week}'s ${MEAL_LABEL[mt]}`, `${dayLong(selected.day_of_week)} se ${MEAL_LABEL[mt]}`);
+            })()}</span>
             <span className="emoji">{art.emoji}</span>
           </div>
           <div className="hero-body">
@@ -110,12 +124,12 @@ export default function Dashboard({ goTo }) {
       )}
 
       {/* Week at a glance — tap a day to show its meal in the card above */}
-      {meals.length > 0 && (
+      {dayMeals.length > 0 && (
         <div className="card">
           <h2>{tr('The week at a glance', 'Die week in ’n neutedop')}</h2>
           <p className="muted" style={{ margin: '0 0 6px' }}>{tr('Tap a day to see its dinner above.', 'Tik op ’n dag om sy aandete hierbo te sien.')}</p>
           <div className="week-strip" style={{ marginTop: 10 }}>
-            {meals.map(m => {
+            {dayMeals.map(m => {
               const a = foodArt(m);
               const isSel = selected && m.entry_id === selected.entry_id;
               return (

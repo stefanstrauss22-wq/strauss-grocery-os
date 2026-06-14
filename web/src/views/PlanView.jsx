@@ -5,22 +5,45 @@ import Nutrition from '../components/Nutrition.jsx';
 import { useLang, useAutoTranslate, ingredientEnglish } from '../i18n.jsx';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const MEAL_ORDER = { breakfast: 0, lunch: 1, dinner: 2 };
+const isoDate = v => String(v).slice(0, 10);
 const fmtDay = (iso, locale = 'en-ZA') => new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 // tags is stored as a JSON array (sometimes as a JSON string) — normalise to an array.
 const parseTags = t => (Array.isArray(t) ? t : (() => { try { return JSON.parse(t || '[]'); } catch { return []; } })()) || [];
+const blankWeek = () => Object.fromEntries(DAYS.map(d => [d, 'normal']));
 
 export default function PlanView() {
   const { tr, locale, lang, dayShort, dayLong } = useLang();
-  // One dropdown per night: cooking effort + the meal-type themes, in one control.
-  const NIGHT_OPTIONS = [
-    { value: 'normal',    label: tr('🍳 Normal', '🍳 Normaal') },
-    { value: 'quick',     label: tr('⚡ Quick (≤20 min)', '⚡ Vinnig (≤20 min)') },
-    { value: 'braai',     label: tr('🔥 Braai', '🔥 Braai') },
-    { value: 'fish',      label: tr('🐟 Fish', '🐟 Vis') },
-    { value: 'air_fryer', label: tr('🍟 Air fryer', '🍟 Lugbraaier') },
-    { value: 'leftover',  label: tr('♻️ Leftovers', '♻️ Oorskiet') },
-    { value: 'off',       label: tr('🚫 Not cooking', '🚫 Kook nie') },
-  ];
+  // Meal types the family can plan, and the per-meal per-day style options.
+  const MEALS = {
+    breakfast: { emoji: '🍳', label: tr('Breakfast', 'Ontbyt') },
+    lunch: { emoji: '🥪', label: tr('Lunch', 'Middagete') },
+    dinner: { emoji: '🍽️', label: tr('Dinner', 'Aandete') },
+  };
+  const OPT = {
+    dinner: [
+      { value: 'normal',    label: tr('🍳 Normal', '🍳 Normaal') },
+      { value: 'quick',     label: tr('⚡ Quick (≤20 min)', '⚡ Vinnig (≤20 min)') },
+      { value: 'braai',     label: tr('🔥 Braai', '🔥 Braai') },
+      { value: 'fish',      label: tr('🐟 Fish', '🐟 Vis') },
+      { value: 'air_fryer', label: tr('🍟 Air fryer', '🍟 Lugbraaier') },
+      { value: 'leftover',  label: tr('♻️ Leftovers', '♻️ Oorskiet') },
+      { value: 'off',       label: tr('🚫 Not cooking', '🚫 Kook nie') },
+    ],
+    breakfast: [
+      { value: 'normal',    label: tr('🍳 Normal', '🍳 Normaal') },
+      { value: 'quick',     label: tr('⚡ Quick (≤10 min)', '⚡ Vinnig (≤10 min)') },
+      { value: 'leftover',  label: tr('♻️ Leftovers', '♻️ Oorskiet') },
+      { value: 'off',       label: tr('🚫 Skip', '🚫 Slaan oor') },
+    ],
+    lunch: [
+      { value: 'normal',    label: tr('🥪 Normal', '🥪 Normaal') },
+      { value: 'quick',     label: tr('⚡ Quick (≤20 min)', '⚡ Vinnig (≤20 min)') },
+      { value: 'fish',      label: tr('🐟 Fish', '🐟 Vis') },
+      { value: 'leftover',  label: tr('♻️ Leftovers', '♻️ Oorskiet') },
+      { value: 'off',       label: tr('🚫 Skip', '🚫 Slaan oor') },
+    ],
+  };
   const CHIPS = [
     tr('Cheaper week 💸', 'Goedkoper week 💸'),
     tr('One-pot meals 🍲', 'Eenpot-etes 🍲'),
@@ -31,33 +54,40 @@ export default function PlanView() {
     tr('No spicy food', 'Geen skerp kos'),
   ];
   const [weekStart, setWeekStart] = useState(todayISO());
-  // Planning horizon — next 3 nights or next 7. Remembered between visits so a
-  // family that always plans short keeps that as their default.
+  // Planning horizon — next 3 nights or next 7. Remembered between visits.
   const [horizon, setHorizonState] = useState(() => {
     try { return Number(localStorage.getItem('planHorizon')) === 3 ? 3 : 7; } catch { return 7; }
   });
   const setHorizon = h => { try { localStorage.setItem('planHorizon', String(h)); } catch { /* ignore */ } setHorizonState(h); };
+  // Which meals to plan — dinner by default; breakfast/lunch optional. Remembered.
+  const [mealTypes, setMealTypesState] = useState(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('planMealTypes'));
+      const f = Array.isArray(v) ? v.filter(t => MEAL_ORDER[t] !== undefined) : [];
+      if (f.length) return f.sort((a, b) => MEAL_ORDER[a] - MEAL_ORDER[b]);
+    } catch { /* ignore */ }
+    return ['dinner'];
+  });
+  const setMealTypes = arr => { try { localStorage.setItem('planMealTypes', JSON.stringify(arr)); } catch { /* ignore */ } setMealTypesState(arr); };
+  const toggleMealType = t => {
+    if (mealTypes.includes(t)) { if (mealTypes.length > 1) setMealTypes(mealTypes.filter(x => x !== t)); }
+    else setMealTypes([...mealTypes, t].sort((a, b) => MEAL_ORDER[a] - MEAL_ORDER[b]));
+  };
   const windowDays = planWindow(weekStart, horizon); // the days of this run, in order
   const [plan, setPlan] = useState(null);
   const [budget, setBudget] = useState(2500);
-  const [schedule, setSchedule] = useState(Object.fromEntries(DAYS.map(d => [d, 'normal'])));
+  const [schedule, setSchedule] = useState({ breakfast: blankWeek(), lunch: blankWeek(), dinner: blankWeek() });
   const [chips, setChips] = useState([]);
   const [haveAtHome, setHaveAtHome] = useState('');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  const [summary, setSummary] = useState(null);
   const [swapping, setSwapping] = useState(null);
-  // Translate recipe text + cuisine + tags + ingredient names for display
-  // (stored data stays English / as generated).
+  // Translate recipe text + cuisine + tags + ingredient names for display.
   const tx = useAutoTranslate((plan?.meals || []).flatMap(m =>
     [m.title, m.description, m.instructions, m.cuisine, ...parseTags(m.tags),
      ...((m.ingredients || []).map(ingredientEnglish))]));
 
-  // Show the plan for the selected start date; if none exists there yet, fall
-  // back to the current rolling plan so the active week stays visible. The date
-  // picker itself stays on TODAY, so "Generate/Regenerate" always builds a fresh
-  // 7 days from now (locked days in the window are kept by the server).
   const loadPlan = async ws => {
     try { setPlan(await api.get(`/plan/${ws}`)); }
     catch { try { setPlan(await api.get('/plan/current')); } catch { setPlan(null); } }
@@ -66,7 +96,7 @@ export default function PlanView() {
 
   // Generation/swap runs in the background on the server; poll the plan until
   // its status flips away from 'generating'. Resolves with the finished plan.
-  function pollUntilReady(ws, { timeoutMs = 240000, intervalMs = 4000 } = {}) {
+  function pollUntilReady(ws, { timeoutMs = 300000, intervalMs = 4000 } = {}) {
     const start = Date.now();
     return new Promise((resolve, reject) => {
       const tick = async () => {
@@ -91,19 +121,20 @@ export default function PlanView() {
       .catch(() => {});
   }, []);
 
-  const setNight = (day, value) => setSchedule(s => ({ ...s, [day]: value }));
+  const setStyle = (mealType, day, value) => setSchedule(s => ({ ...s, [mealType]: { ...s[mealType], [day]: value } }));
   const toggleChip = c => setChips(cs => cs.includes(c) ? cs.filter(x => x !== c) : [...cs, c]);
 
   async function generate() {
-    setBusy(true); setErr(null); setSummary(null);
+    setBusy(true); setErr(null);
     try {
       await api.post('/plan/generate', {
         week_start: weekStart,
-        horizon_days: horizon, // plan the next 3 or 7 nights
-        language: lang, // recipes written in this language; ingredient names stay English
+        horizon_days: horizon,
+        language: lang,
         week: {
           budget_rand: budget,
-          schedule,
+          meal_types: mealTypes,
+          schedule: Object.fromEntries(mealTypes.map(mt => [mt, schedule[mt]])),
           mood_chips: chips,
           have_at_home: haveAtHome.split(',').map(s => s.trim()).filter(Boolean),
           notes,
@@ -116,12 +147,15 @@ export default function PlanView() {
     setBusy(false);
   }
 
-  async function swap(day) {
-    const reason = prompt(tr(`Why swap ${day}'s meal? (e.g. "too fancy", "kids won't eat it", "make it cheaper")`, `Hoekom ruil ${day} se ete uit? (bv. "te deftig", "die kinders eet dit nie", "maak dit goedkoper")`));
+  async function swap(meal) {
+    const mealType = meal.meal_type || 'dinner';
+    const what = `${MEALS[mealType].label} (${dayLong(meal.day_of_week)})`;
+    const reason = prompt(tr(`Why swap this ${what}? (e.g. "too fancy", "kids won't eat it", "make it cheaper")`, `Hoekom ruil hierdie ${what} uit? (bv. "te deftig", "die kinders eet dit nie", "maak dit goedkoper")`));
     if (reason === null) return;
-    setSwapping(day); setErr(null);
+    const key = `${meal.day_of_week}|${mealType}`;
+    setSwapping(key); setErr(null);
     try {
-      await api.post(`/plan/${weekStart}/swap`, { day, reason });
+      await api.post(`/plan/${weekStart}/swap`, { day: meal.day_of_week, meal_type: mealType, reason });
       const p = await pollUntilReady(weekStart);
       setPlan(p);
     } catch (e) { setErr(e.message); }
@@ -147,6 +181,72 @@ export default function PlanView() {
     alert(rating > 0 ? tr('Noted — the planner will bring this back 👍', 'Genoteer — die beplanner sal dit weer voorstel 👍') : tr('Noted — the planner will avoid this 👎', 'Genoteer — die beplanner sal dit vermy 👎'));
   }
 
+  // One meal card. `showType` puts a meal-type pill on the art (used when a day
+  // shows more than one meal); otherwise the weekday pill is shown.
+  const mealCard = (meal, showType) => {
+    const art = foodArt(meal);
+    const tags = parseTags(meal.tags);
+    const mt = meal.meal_type || 'dinner';
+    const swapKey = `${meal.day_of_week}|${mt}`;
+    return (
+      <div key={meal.entry_id} className={`meal-card ${meal.locked ? 'locked' : ''}`}>
+        <div className="meal-art" style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
+          <span className="day-pill">{showType ? `${MEALS[mt].emoji} ${MEALS[mt].label}` : `${dayLong(meal.day_of_week)}${meal.meal_date ? ` · ${fmtDay(meal.meal_date, locale)}` : ''}`}</span>
+          {meal.locked && <span className="lock-pill">📌</span>}
+          <span className="emoji">{art.emoji}</span>
+        </div>
+        <div className="meal-body">
+          <h3>{meal.title ? tx(meal.title) : '—'}</h3>
+          <p className="desc">{tx(meal.description)}</p>
+          <div style={{ marginBottom: 6 }}>
+            {meal.cuisine && <span className="tag gold">{tx(meal.cuisine)}</span>}
+            {tags.slice(0, 3).map(t => <span key={t} className="tag">{tx(t)}</span>)}
+          </div>
+          <div className="meta">
+            <span>⏱ {(meal.prep_minutes || 0) + (meal.cook_minutes || 0)} min</span>
+            <span>💰 ~R{Math.round((meal.est_cost_cents || 0) / 100)}</span>
+            <span>🍽 {meal.servings}</span>
+            {meal.calories_kcal != null && <span>🔥 {meal.calories_kcal} kcal</span>}
+          </div>
+          {meal.ingredients?.length > 0 && (
+            <details>
+              <summary>{tr('Recipe & ingredients', 'Resep & bestanddele')}</summary>
+              <Nutrition recipe={meal} />
+              <ul className="muted" style={{ paddingLeft: 18 }}>
+                {meal.ingredients.map((ing, i) => (
+                  <li key={i}>{tx(ingredientEnglish(ing))}</li>
+                ))}
+              </ul>
+              <p className="muted" style={{ whiteSpace: 'pre-wrap' }}>{tx(meal.instructions)}</p>
+            </details>
+          )}
+          <div className="actions">
+            <button className="ghost tiny" disabled={swapping === swapKey} onClick={() => swap(meal)}>
+              {swapping === swapKey ? tr('⏳ swapping…', '⏳ ruil tans…') : tr('🔄 Swap', '🔄 Ruil')}
+            </button>
+            <button className="ghost tiny" onClick={() => toggleLock(meal)}>{meal.locked ? tr('🔓 Unlock', '🔓 Sluit oop') : tr('📌 Lock', '📌 Sluit')}</button>
+            {meal.id && <>
+              <button className="ghost tiny" onClick={() => rate(meal, 1)}>👍</button>
+              <button className="ghost tiny" onClick={() => rate(meal, -1)}>👎</button>
+            </>}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Group the plan's meals by day (server returns them date- then slot-ordered).
+  const dayGroups = [];
+  { const seen = {};
+    for (const m of (plan?.meals || [])) {
+      const k = m.meal_date ? isoDate(m.meal_date) : m.day_of_week;
+      if (!seen[k]) { seen[k] = { key: k, date: m.meal_date, day: m.day_of_week, meals: [] }; dayGroups.push(seen[k]); }
+      seen[k].meals.push(m);
+    } }
+  const planMealTypeCount = new Set((plan?.meals || []).map(m => m.meal_type || 'dinner')).size;
+  const grouped = planMealTypeCount > 1; // group by day only when a day has >1 meal
+  const mealCount = mealTypes.length * horizon;
+
   return (
     <div>
       <div className="card">
@@ -166,16 +266,30 @@ export default function PlanView() {
             <button type="button" className={horizon === 7 ? 'active' : ''} onClick={() => setHorizon(7)}>{tr('Next 7 days', 'Volgende 7 dae')}</button>
           </div>
         </div>
+        <div className="field" style={{ marginTop: 14 }}>
+          <span style={{ display: 'block' }}>{tr('Which meals?', 'Watter etes?')}</span>
+          <div className="mt-select" role="group" aria-label={tr('Meals to plan', 'Etes om te beplan')} style={{ marginTop: 14 }}>
+            {['breakfast', 'lunch', 'dinner'].map(mt => (
+              <button key={mt} type="button" className={mealTypes.includes(mt) ? 'active' : ''} onClick={() => toggleMealType(mt)}>
+                {MEALS[mt].emoji} {MEALS[mt].label}
+              </button>
+            ))}
+          </div>
+        </div>
         <p className="muted" style={{ marginTop: 8 }}>{tr(`${horizon} days`, `${horizon} dae`)}: {fmtDay(weekStart, locale)} → {fmtDay(addDays(weekStart, horizon - 1), locale)}</p>
-        <h3>{tr('Each night — pick the kind of dinner', 'Elke aand — kies die soort aandete')}</h3>
-        <div className="night-list">
+        <h3>{tr('Plan each day — pick the kind of meal', 'Beplan elke dag — kies die soort ete')}</h3>
+        <div className="grid cols2" style={{ marginTop: 4 }}>
           {windowDays.map(w => (
-            <div key={w.date} className="night-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
-              <span style={{ minWidth: 92, fontWeight: 600 }}>{dayShort(w.weekday)} {fmtDay(w.date, locale)}</span>
-              <select className="night-select" style={{ flex: 1, padding: '8px 10px' }}
-                value={schedule[w.weekday]} onChange={e => setNight(w.weekday, e.target.value)}>
-                {NIGHT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+            <div key={w.date} className="day-plan">
+              <div className="day-plan-head">{dayShort(w.weekday)} {fmtDay(w.date, locale)}</div>
+              {mealTypes.map(mt => (
+                <label key={mt} className="meal-row">
+                  <span className="meal-row-label">{MEALS[mt].emoji} {MEALS[mt].label}</span>
+                  <select value={schedule[mt][w.weekday]} onChange={e => setStyle(mt, w.weekday, e.target.value)}>
+                    {OPT[mt].map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </label>
+              ))}
             </div>
           ))}
         </div>
@@ -196,9 +310,8 @@ export default function PlanView() {
         <button className="primary" disabled={busy} onClick={generate}>
           {busy ? <span><span className="spinner">⏳</span> {tr('Planning…', 'Beplan…')}</span> : (plan ? tr('Regenerate plan (locked meals kept)', 'Stel plan weer op (geslote etes bly behoue)') : tr("Generate this week's plan", 'Stel hierdie week se plan op'))}
         </button>
-        {busy && <p className="muted" style={{ marginTop: 10 }}>{tr(`Cooking up ${horizon} dinners with costed ingredients — this takes about a minute. You can leave this open.`, `Kook tans ${horizon} aandetes met gekoste bestanddele — dit neem omtrent ’n minuut. Jy kan dit oop laat.`)}</p>}
+        {busy && <p className="muted" style={{ marginTop: 10 }}>{tr(`Cooking up ${mealCount} meals with costed ingredients — this takes a minute or two. You can leave this open.`, `Kook tans ${mealCount} etes met gekoste bestanddele — dit neem ’n minuut of twee. Jy kan dit oop laat.`)}</p>}
         {err && <div className="error-box">{err}</div>}
-        {summary && <p className="muted" style={{ marginTop: 10 }}>{summary}</p>}
       </div>
 
       {plan && (
@@ -208,56 +321,20 @@ export default function PlanView() {
             <div className="spacer" />
             <button className="primary" disabled={busy} onClick={toList}>{tr('Send ingredients to shopping list →', 'Stuur bestanddele na inkopielys →')}</button>
           </div>
-          <div className="grid cols2" style={{ marginTop: 10 }}>
-            {plan.meals.map(meal => {
-              const art = foodArt(meal);
-              const tags = parseTags(meal.tags);
-              return (
-              <div key={meal.entry_id} className={`meal-card ${meal.locked ? 'locked' : ''}`}>
-                <div className="meal-art" style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
-                  <span className="day-pill">{dayLong(meal.day_of_week)}{meal.meal_date ? ` · ${fmtDay(meal.meal_date, locale)}` : ''}</span>
-                  {meal.locked && <span className="lock-pill">📌</span>}
-                  <span className="emoji">{art.emoji}</span>
-                </div>
-                <div className="meal-body">
-                <h3>{meal.title ? tx(meal.title) : '—'}</h3>
-                <p className="desc">{tx(meal.description)}</p>
-                <div style={{ marginBottom: 6 }}>
-                  {meal.cuisine && <span className="tag gold">{tx(meal.cuisine)}</span>}
-                  {tags.slice(0, 3).map(t => <span key={t} className="tag">{tx(t)}</span>)}
-                </div>
-                <div className="meta">
-                  <span>⏱ {(meal.prep_minutes || 0) + (meal.cook_minutes || 0)} min</span>
-                  <span>💰 ~R{Math.round((meal.est_cost_cents || 0) / 100)}</span>
-                  <span>🍽 {meal.servings}</span>
-                  {meal.calories_kcal != null && <span>🔥 {meal.calories_kcal} kcal</span>}
-                </div>
-                {meal.ingredients?.length > 0 && (
-                  <details>
-                    <summary>{tr('Recipe & ingredients', 'Resep & bestanddele')}</summary>
-                    <Nutrition recipe={meal} />
-                    <ul className="muted" style={{ paddingLeft: 18 }}>
-                      {meal.ingredients.map((ing, i) => (
-                        <li key={i}>{tx(ingredientEnglish(ing))}</li>
-                      ))}
-                    </ul>
-                    <p className="muted" style={{ whiteSpace: 'pre-wrap' }}>{tx(meal.instructions)}</p>
-                  </details>
-                )}
-                <div className="actions">
-                  <button className="ghost tiny" disabled={swapping === meal.day_of_week} onClick={() => swap(meal.day_of_week)}>
-                    {swapping === meal.day_of_week ? tr('⏳ swapping…', '⏳ ruil tans…') : tr('🔄 Swap', '🔄 Ruil')}
-                  </button>
-                  <button className="ghost tiny" onClick={() => toggleLock(meal)}>{meal.locked ? tr('🔓 Unlock', '🔓 Sluit oop') : tr('📌 Lock', '📌 Sluit')}</button>
-                  {meal.id && <>
-                    <button className="ghost tiny" onClick={() => rate(meal, 1)}>👍</button>
-                    <button className="ghost tiny" onClick={() => rate(meal, -1)}>👎</button>
-                  </>}
-                </div>
+          {grouped ? (
+            dayGroups.map(g => (
+              <div key={g.key} className="day-group">
+                <h3 className="day-group-head">{dayLong(g.day)}{g.date ? ` · ${fmtDay(g.date, locale)}` : ''}</h3>
+                <div className="grid cols2">
+                  {g.meals.map(meal => mealCard(meal, true))}
                 </div>
               </div>
-            );})}
-          </div>
+            ))
+          ) : (
+            <div className="grid cols2" style={{ marginTop: 10 }}>
+              {(plan.meals || []).map(meal => mealCard(meal, false))}
+            </div>
+          )}
         </div>
       )}
     </div>
