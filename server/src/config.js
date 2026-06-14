@@ -10,6 +10,7 @@ export const config = {
     verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || null,
     token: process.env.WHATSAPP_TOKEN || null,
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || null,
+    appId: process.env.WHATSAPP_APP_ID || '2040786109842671', // public app id (not a secret)
   },
   openaiApiKey: process.env.OPENAI_API_KEY || null,
 };

@@ -109,6 +109,54 @@ router.post('/simulate', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// POST /api/whatsapp/profile-photo  { image_url, about?, description? }
+// Sets the WhatsApp business profile picture (and optionally the about/description
+// text) via Meta's resumable upload. NOTE: on the free test number Meta may
+// reject profile changes — works once on a real business number.
+const GRAPH = 'https://graph.facebook.com/v21.0';
+router.post('/profile-photo', async (req, res, next) => {
+  try {
+    const { token, phoneNumberId, appId } = config.whatsapp;
+    if (!token || !phoneNumberId) return res.status(400).json({ error: 'WhatsApp not configured (token/phone id missing)' });
+    const { image_url, about, description } = req.body;
+    if (!image_url) return res.status(400).json({ error: 'image_url is required' });
+
+    // 1. Fetch the image bytes.
+    const imgRes = await fetch(image_url);
+    if (!imgRes.ok) return res.status(400).json({ error: `could not fetch image_url (${imgRes.status})` });
+    const fileType = imgRes.headers.get('content-type') || 'image/png';
+    const buf = Buffer.from(await imgRes.arrayBuffer());
+
+    // 2. Open a resumable upload session against the app.
+    const sessRes = await fetch(
+      `${GRAPH}/${appId}/uploads?file_name=bot-photo&file_length=${buf.length}&file_type=${encodeURIComponent(fileType)}&access_token=${token}`,
+      { method: 'POST' });
+    const sess = await sessRes.json();
+    if (!sess.id) return res.status(502).json({ step: 'create_session', error: sess });
+
+    // 3. Upload the bytes; Meta returns a file handle.
+    const upRes = await fetch(`${GRAPH}/${sess.id}`, {
+      method: 'POST',
+      headers: { Authorization: `OAuth ${token}`, file_offset: '0' },
+      body: buf,
+    });
+    const up = await upRes.json();
+    if (!up.h) return res.status(502).json({ step: 'upload', error: up });
+
+    // 4. Apply the handle (and any text) to the business profile.
+    const body = { messaging_product: 'whatsapp', profile_picture_handle: up.h };
+    if (about) body.about = about;
+    if (description) body.description = description;
+    const profRes = await fetch(`${GRAPH}/${phoneNumberId}/whatsapp_business_profile`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const prof = await profRes.json();
+    res.status(profRes.ok ? 200 : 502).json({ ok: profRes.ok, handle: up.h, result: prof });
+  } catch (e) { next(e); }
+});
+
 // Recent message log
 router.get('/messages', async (req, res, next) => {
   try {
