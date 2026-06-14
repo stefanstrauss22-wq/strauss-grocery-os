@@ -5,9 +5,17 @@ import { foodArt } from '../foodArt.js';
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const SHORT = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun' };
 const fmtDay = iso => new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
-const SLOT_STATES = ['normal', 'quick', 'off'];
-const SLOT_ICON = { normal: '🍳', quick: '⚡', off: '🚫' };
-const CHIPS = ['Braai night 🔥', 'Cheaper week 💸', 'Fish night 🐟', 'Vegetarian night 🥦', 'One-pot meals 🍲', 'Air fryer night', 'Use up the freezer 🧊', 'Leftover night ♻️', 'Old favourites ⭐', 'Try something new 🎲', 'Kid-friendly 🧒', 'No spicy food'];
+// One dropdown per night: cooking effort + the meal-type themes, in one control.
+const NIGHT_OPTIONS = [
+  { value: 'normal',    label: '🍳 Normal' },
+  { value: 'quick',     label: '⚡ Quick (≤20 min)' },
+  { value: 'braai',     label: '🔥 Braai' },
+  { value: 'fish',      label: '🐟 Fish' },
+  { value: 'air_fryer', label: '🍟 Air fryer' },
+  { value: 'leftover',  label: '♻️ Leftovers' },
+  { value: 'off',       label: '🚫 Not cooking' },
+];
+const CHIPS = ['Cheaper week 💸', 'One-pot meals 🍲', 'Old favourites ⭐', 'Use up the freezer 🧊', 'Try something new 🎲', 'Kid-friendly 🧒', 'No spicy food'];
 
 export default function PlanView() {
   const [weekStart, setWeekStart] = useState(todayISO());
@@ -65,7 +73,7 @@ export default function PlanView() {
       .catch(() => {});
   }, []);
 
-  const cycleSlot = day => setSchedule(s => ({ ...s, [day]: SLOT_STATES[(SLOT_STATES.indexOf(s[day]) + 1) % 3] }));
+  const setNight = (day, value) => setSchedule(s => ({ ...s, [day]: value }));
   const toggleChip = c => setChips(cs => cs.includes(c) ? cs.filter(x => x !== c) : [...cs, c]);
 
   async function generate() {
@@ -132,13 +140,16 @@ export default function PlanView() {
           </label>
         </div>
         <p className="muted" style={{ marginTop: -4 }}>7 days: {fmtDay(weekStart)} → {fmtDay(addDays(weekStart, 6))}</p>
-        <h3>Schedule — tap a night: 🍳 normal → ⚡ quick (≤20 min) → 🚫 not cooking</h3>
-        <div className="schedule-grid">
-          {windowDays.map(w => <div key={w.date} className="day">{SHORT[w.weekday]}</div>)}
+        <h3>Each night — pick the kind of dinner</h3>
+        <div className="night-list">
           {windowDays.map(w => (
-            <button key={w.date} className={`slot ${schedule[w.weekday]}`} onClick={() => cycleSlot(w.weekday)} title={schedule[w.weekday]}>
-              {SLOT_ICON[schedule[w.weekday]]}
-            </button>
+            <div key={w.date} className="night-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+              <span style={{ minWidth: 92, fontWeight: 600 }}>{SHORT[w.weekday]} {fmtDay(w.date)}</span>
+              <select className="night-select" style={{ flex: 1, padding: '8px 10px' }}
+                value={schedule[w.weekday]} onChange={e => setNight(w.weekday, e.target.value)}>
+                {NIGHT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
           ))}
         </div>
         <h3>This week's mood</h3>
