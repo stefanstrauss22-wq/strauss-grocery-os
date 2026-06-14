@@ -14,8 +14,8 @@ function addDays(iso, n) {
   return dt.toISOString().slice(0, 10);
 }
 const weekdayOf = iso => WEEKDAYS[(() => { const [y, m, d] = isoDate(iso).split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); })()];
-// The 7 calendar days of a plan, starting at startISO (any weekday).
-const planWindow = startISO => Array.from({ length: 7 }, (_, i) => { const date = addDays(startISO, i); return { date, weekday: weekdayOf(date) }; });
+// The calendar days of a plan (3 or 7), starting at startISO (any weekday).
+const planWindow = (startISO, days = 7) => Array.from({ length: days }, (_, i) => { const date = addDays(startISO, i); return { date, weekday: weekdayOf(date) }; });
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 async function getSetting(key, fallback) {
@@ -50,26 +50,32 @@ async function loadPlan(weekStart) {
   return { ...plan, meals };
 }
 
-async function persistGeneratedPlan(weekStart, context, generated, { replaceDay = null, existingPlanId = null } = {}) {
+async function persistGeneratedPlan(weekStart, context, generated, { replaceDay = null, existingPlanId = null, days = 7 } = {}) {
   let planId = existingPlanId;
   if (!planId) {
     const existing = await query('SELECT id FROM meal_plans WHERE week_start = $1', [weekStart]);
     if (existing.rows.length) {
       planId = existing.rows[0].id;
-      await query('UPDATE meal_plans SET context = $1 WHERE id = $2', [JSON.stringify(context), planId]);
+      await query('UPDATE meal_plans SET context = $1, horizon_days = $2 WHERE id = $3', [JSON.stringify(context), days, planId]);
     } else {
       const { rows } = await query(
-        'INSERT INTO meal_plans (week_start, context) VALUES ($1, $2) RETURNING id',
-        [weekStart, JSON.stringify(context)]
+        'INSERT INTO meal_plans (week_start, context, horizon_days) VALUES ($1, $2, $3) RETURNING id',
+        [weekStart, JSON.stringify(context), days]
       );
       planId = rows[0].id;
     }
   }
-  // Rolling regen: carry any LOCKED meal whose date falls in this 7-day window
-  // into this plan (even if it lived on a previous, differently-dated plan), so
+  // Full regen may also change the horizon (e.g. 7 → 3 nights): drop any entry
+  // whose weekday now falls outside the window so no stale days linger.
+  if (!replaceDay) {
+    const windowWeekdays = planWindow(weekStart, days).map(w => w.weekday);
+    await query('DELETE FROM meal_plan_entries WHERE plan_id = $1 AND day_of_week <> ALL($2::text[])', [planId, windowWeekdays]);
+  }
+  // Rolling regen: carry any LOCKED meal whose date falls in this window into
+  // this plan (even if it lived on a previous, differently-dated plan), so
   // "keep my locked days" works as the start date rolls forward day to day.
   if (!replaceDay) {
-    const windowDates = planWindow(weekStart).map(w => w.date);
+    const windowDates = planWindow(weekStart, days).map(w => w.date);
     await query(
       `INSERT INTO meal_plan_entries (plan_id, day_of_week, recipe_id, locked, meal_date)
        SELECT $1, e.day_of_week, e.recipe_id, true, e.meal_date
@@ -109,7 +115,7 @@ async function persistGeneratedPlan(weekStart, context, generated, { replaceDay 
   }
   // Stamp every entry in the window with its calendar date (covers generated,
   // swapped and locked-and-kept entries) so the plan renders in date order.
-  for (const w of planWindow(weekStart)) {
+  for (const w of planWindow(weekStart, days)) {
     await query('UPDATE meal_plan_entries SET meal_date = $1 WHERE plan_id = $2 AND day_of_week = $3',
       [w.date, planId, w.weekday]);
   }
@@ -117,12 +123,22 @@ async function persistGeneratedPlan(weekStart, context, generated, { replaceDay 
 }
 
 // Mark a week's plan row with a generation status so the client can poll.
-async function setPlanStatus(weekStart, status, extra = {}) {
-  await query(
-    `INSERT INTO meal_plans (week_start, status, context) VALUES ($1, $2, $3)
-     ON CONFLICT (week_start) DO UPDATE SET status = EXCLUDED.status`,
-    [weekStart, status, JSON.stringify(extra)]
-  );
+// Stamps the chosen horizon up front so the window length is known while the
+// plan is still generating.
+async function setPlanStatus(weekStart, status, horizonDays = null) {
+  if (horizonDays) {
+    await query(
+      `INSERT INTO meal_plans (week_start, status, horizon_days) VALUES ($1, $2, $3)
+       ON CONFLICT (week_start) DO UPDATE SET status = EXCLUDED.status, horizon_days = EXCLUDED.horizon_days`,
+      [weekStart, status, horizonDays]
+    );
+  } else {
+    await query(
+      `INSERT INTO meal_plans (week_start, status) VALUES ($1, $2)
+       ON CONFLICT (week_start) DO UPDATE SET status = EXCLUDED.status`,
+      [weekStart, status]
+    );
+  }
 }
 
 // POST /api/plan/generate  { week_start, week: {...} }
@@ -134,7 +150,8 @@ router.post('/generate', async (req, res, next) => {
     const { week_start, week = {}, language = 'en' } = req.body;
     if (!week_start) return res.status(400).json({ error: 'week_start (start date, YYYY-MM-DD) is required' });
 
-    const window = planWindow(week_start); // 7 days from the chosen start, any weekday
+    const horizon = Number(req.body.horizon_days) === 3 ? 3 : 7; // next 3 or next 7 nights
+    const window = planWindow(week_start, horizon); // N days from the chosen start, any weekday
     const profile = await getSetting('household_profile', {});
     const ratings = await query(`
       SELECT r.title, SUM(m.rating)::int AS score, COUNT(*)::int AS votes
@@ -166,14 +183,14 @@ router.post('/generate', async (req, res, next) => {
       },
     };
 
-    await setPlanStatus(week_start, 'generating');
+    await setPlanStatus(week_start, 'generating', horizon);
     res.status(202).json({ status: 'generating' });
 
     // Background work — not awaited by the response.
     (async () => {
       try {
         const generated = await generatePlan(context);
-        const planId = await persistGeneratedPlan(week_start, context, generated);
+        const planId = await persistGeneratedPlan(week_start, context, generated, { days: horizon });
         await query(`UPDATE meal_plans SET status = 'active' WHERE id = $1`, [planId]);
         console.log(`plan generated for ${week_start}`);
       } catch (err) {
@@ -188,9 +205,9 @@ router.post('/generate', async (req, res, next) => {
 router.get('/current', async (req, res, next) => {
   try {
     const today = todayISO();
-    const { rows } = await query(`SELECT week_start FROM meal_plans WHERE status <> 'error' ORDER BY week_start DESC`);
+    const { rows } = await query(`SELECT week_start, COALESCE(horizon_days, 7) AS horizon_days FROM meal_plans WHERE status <> 'error' ORDER BY week_start DESC`);
     if (!rows.length) return res.status(404).json({ error: 'no plans yet' });
-    const inWindow = rows.find(r => isoDate(r.week_start) <= today && today <= addDays(r.week_start, 6));
+    const inWindow = rows.find(r => isoDate(r.week_start) <= today && today <= addDays(r.week_start, r.horizon_days - 1));
     const plan = await loadPlan(isoDate((inWindow || rows[0]).week_start));
     res.json(plan);
   } catch (e) { next(e); }
@@ -237,7 +254,7 @@ router.post('/:weekStart/swap', async (req, res, next) => {
     (async () => {
       try {
         const generated = await swapMeal(ctx, current, day, reason);
-        await persistGeneratedPlan(weekStart, ctx, generated, { replaceDay: day, existingPlanId: plan.id });
+        await persistGeneratedPlan(weekStart, ctx, generated, { replaceDay: day, existingPlanId: plan.id, days: plan.horizon_days || 7 });
         await query(`UPDATE meal_plans SET status = 'active' WHERE id = $1`, [plan.id]);
         console.log(`swapped ${day} for ${weekStart}`);
       } catch (err) {

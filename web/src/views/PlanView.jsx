@@ -28,7 +28,13 @@ export default function PlanView() {
     tr('No spicy food', 'Geen skerp kos'),
   ];
   const [weekStart, setWeekStart] = useState(todayISO());
-  const windowDays = planWindow(weekStart); // the 7 days of this run, in order
+  // Planning horizon — next 3 nights or next 7. Remembered between visits so a
+  // family that always plans short keeps that as their default.
+  const [horizon, setHorizonState] = useState(() => {
+    try { return Number(localStorage.getItem('planHorizon')) === 3 ? 3 : 7; } catch { return 7; }
+  });
+  const setHorizon = h => { try { localStorage.setItem('planHorizon', String(h)); } catch { /* ignore */ } setHorizonState(h); };
+  const windowDays = planWindow(weekStart, horizon); // the days of this run, in order
   const [plan, setPlan] = useState(null);
   const [budget, setBudget] = useState(2500);
   const [schedule, setSchedule] = useState(Object.fromEntries(DAYS.map(d => [d, 'normal'])));
@@ -88,6 +94,7 @@ export default function PlanView() {
     try {
       await api.post('/plan/generate', {
         week_start: weekStart,
+        horizon_days: horizon, // plan the next 3 or 7 nights
         language: lang, // recipes written in this language; ingredient names stay English
         week: {
           budget_rand: budget,
@@ -147,7 +154,14 @@ export default function PlanView() {
             <input type="range" min="1000" max="6000" step="100" value={budget} onChange={e => setBudget(Number(e.target.value))} />
           </label>
         </div>
-        <p className="muted" style={{ marginTop: -4 }}>{tr('7 days', '7 dae')}: {fmtDay(weekStart, locale)} → {fmtDay(addDays(weekStart, 6), locale)}</p>
+        <div className="field" style={{ marginTop: 8 }}>
+          <span>{tr('How far ahead?', 'Hoe ver vooruit?')}</span>
+          <div className="seg-toggle" role="group" aria-label={tr('Planning length', 'Beplanningslengte')} style={{ marginTop: 6 }}>
+            <button type="button" className={horizon === 3 ? 'active' : ''} onClick={() => setHorizon(3)}>{tr('Next 3 days', 'Volgende 3 dae')}</button>
+            <button type="button" className={horizon === 7 ? 'active' : ''} onClick={() => setHorizon(7)}>{tr('Next 7 days', 'Volgende 7 dae')}</button>
+          </div>
+        </div>
+        <p className="muted" style={{ marginTop: 8 }}>{tr(`${horizon} days`, `${horizon} dae`)}: {fmtDay(weekStart, locale)} → {fmtDay(addDays(weekStart, horizon - 1), locale)}</p>
         <h3>{tr('Each night — pick the kind of dinner', 'Elke aand — kies die soort aandete')}</h3>
         <div className="night-list">
           {windowDays.map(w => (
@@ -177,7 +191,7 @@ export default function PlanView() {
         <button className="primary" disabled={busy} onClick={generate}>
           {busy ? <span><span className="spinner">⏳</span> {tr('Planning…', 'Beplan…')}</span> : (plan ? tr('Regenerate plan (locked meals kept)', 'Stel plan weer op (geslote etes bly behoue)') : tr("Generate this week's plan", 'Stel hierdie week se plan op'))}
         </button>
-        {busy && <p className="muted" style={{ marginTop: 10 }}>{tr('Cooking up 7 dinners with costed ingredients — this takes about a minute. You can leave this open.', 'Kook tans 7 aandetes met gekoste bestanddele — dit neem omtrent ’n minuut. Jy kan dit oop laat.')}</p>}
+        {busy && <p className="muted" style={{ marginTop: 10 }}>{tr(`Cooking up ${horizon} dinners with costed ingredients — this takes about a minute. You can leave this open.`, `Kook tans ${horizon} aandetes met gekoste bestanddele — dit neem omtrent ’n minuut. Jy kan dit oop laat.`)}</p>}
         {err && <div className="error-box">{err}</div>}
         {summary && <p className="muted" style={{ marginTop: 10 }}>{summary}</p>}
       </div>
@@ -185,7 +199,7 @@ export default function PlanView() {
       {plan && (
         <div className="card">
           <div className="row">
-            <h2>{fmtDay(plan.week_start, locale)} → {fmtDay(addDays(plan.week_start, 6), locale)}</h2>
+            <h2>{fmtDay(plan.week_start, locale)} → {fmtDay(addDays(plan.week_start, (plan.horizon_days || 7) - 1), locale)}</h2>
             <div className="spacer" />
             <button className="primary" disabled={busy} onClick={toList}>{tr('Send ingredients to shopping list →', 'Stuur bestanddele na inkopielys →')}</button>
           </div>

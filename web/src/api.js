@@ -40,9 +40,9 @@ export function weekdayOf(iso) {
   return WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
 }
 
-/** The 7 days of a plan window: [{ date, weekday }, …] starting at startISO. */
-export function planWindow(startISO) {
-  return Array.from({ length: 7 }, (_, i) => {
+/** The days of a plan window (3 or 7): [{ date, weekday }, …] from startISO. */
+export function planWindow(startISO, days = 7) {
+  return Array.from({ length: days }, (_, i) => {
     const date = addDays(startISO, i);
     return { date, weekday: weekdayOf(date) };
   });
