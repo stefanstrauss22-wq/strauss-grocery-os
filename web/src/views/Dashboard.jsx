@@ -109,7 +109,7 @@ export default function Dashboard({ goTo }) {
       {/* Week at a glance — tap a day to show its meal in the card above */}
       {meals.length > 0 && (
         <div className="card">
-          <h2>{tr('The week at a glance', 'Die week in een oogopslag')}</h2>
+          <h2>{tr('The week at a glance', 'Die week in ’n neutedop')}</h2>
           <p className="muted" style={{ margin: '0 0 6px' }}>{tr('Tap a day to see its dinner above.', 'Tik op ’n dag om sy aandete hierbo te sien.')}</p>
           <div className="week-strip" style={{ marginTop: 10 }}>
             {meals.map(m => {

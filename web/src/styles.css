@@ -215,9 +215,12 @@ ul.items input[type="checkbox"] { width: 19px; height: 19px; accent-color: var(-
 .hero-body h2 { margin: 0 0 4px; font-size: 1.45rem; font-weight: 600; }
 .hero-body p { margin: 0 0 10px; color: var(--muted); font-size: 0.9rem; }
 
-.week-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+/* Flex row capped at a 7-up block width: 7 days fill the row, while a short
+   3-day plan keeps the same block size and sits centred instead of cramped left. */
+.week-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .week-strip .wday {
-  min-width: 0; /* allow the track to shrink below content width */
+  flex: 1 1 0; min-width: 0; /* allow the block to shrink below content width */
+  max-width: calc((100% - 48px) / 7); /* never wider than one of seven columns */
   background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm);
   padding: 10px 4px; text-align: center; cursor: pointer; transition: all 0.12s ease;
 }
