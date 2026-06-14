@@ -41,6 +41,18 @@ export default function Dashboard({ goTo }) {
   }
   const dayMeals = Object.values(repByDate); // one per day, in date order
   const MEAL_LABEL = { breakfast: tr('breakfast', 'ontbyt'), lunch: tr('lunch', 'middagete'), dinner: tr('dinner', 'aandete') };
+  const MEAL_EMOJI = { breakfast: '🍳', lunch: '🥪', dinner: '🍽️' };
+  // When a plan has more than one meal per day, each day block lists every meal
+  // (breakfast/lunch/dinner) as its own line; a dinner-only plan stays as before.
+  const multiMeal = new Set(allMeals.map(m => m.meal_type || 'dinner')).size > 1;
+  // Meals grouped by day (date order; breakfast→lunch→dinner within a day).
+  const dayGroups = [];
+  { const seen = {};
+    for (const m of allMeals) {
+      const k = m.meal_date ? isoDate(m.meal_date) : m.day_of_week;
+      if (!seen[k]) { seen[k] = { key: k, day: m.day_of_week, date: m.meal_date, meals: [] }; dayGroups.push(seen[k]); }
+      seen[k].meals.push(m);
+    } }
   const todayMeal = dayMeals.find(isToday) || dayMeals[0];
   // The hero shows today's meal by default, or whichever day you tap in the strip.
   const selected = allMeals.find(m => m.entry_id === selectedId) || todayMeal;
@@ -123,20 +135,43 @@ export default function Dashboard({ goTo }) {
         </div>
       )}
 
-      {/* Week at a glance — tap a day to show its meal in the card above */}
-      {dayMeals.length > 0 && (
+      {/* Week at a glance — tap a meal to show it in the card above */}
+      {allMeals.length > 0 && (
         <div className="card">
           <h2>{tr('The week at a glance', 'Die week in ’n neutedop')}</h2>
-          <p className="muted" style={{ margin: '0 0 6px' }}>{tr('Tap a day to see its dinner above.', 'Tik op ’n dag om sy aandete hierbo te sien.')}</p>
+          <p className="muted" style={{ margin: '0 0 6px' }}>{multiMeal ? tr('Tap a meal to see it above.', 'Tik op ’n ete om dit hierbo te sien.') : tr('Tap a day to see its dinner above.', 'Tik op ’n dag om sy aandete hierbo te sien.')}</p>
           <div className="week-strip" style={{ marginTop: 10 }}>
-            {dayMeals.map(m => {
-              const a = foodArt(m);
-              const isSel = selected && m.entry_id === selected.entry_id;
+            {dayGroups.map(g => {
+              const isTodayCol = g.date && isoDate(g.date) === todayISO();
+              // Dinner-only: keep the original single-meal block (day, emoji, title).
+              if (!multiMeal) {
+                const m = g.meals[0];
+                const a = foodArt(m);
+                const isSel = selected && m.entry_id === selected.entry_id;
+                return (
+                  <div key={g.key} className={`wday ${isSel ? 'today' : ''}`} onClick={() => setSelectedId(m.entry_id)} title={m?.title || ''}>
+                    <div className="d">{dayShort(g.day)}</div>
+                    <div className="e">{a.emoji}</div>
+                    <div className="t">{m?.title ? tx(m.title) : '—'}</div>
+                  </div>
+                );
+              }
+              // Multi-meal: one block per day, each meal a tappable line.
               return (
-                <div key={m.entry_id} className={`wday ${isSel ? 'today' : ''}`} onClick={() => setSelectedId(m.entry_id)} title={m?.title || ''}>
-                  <div className="d">{dayShort(m.day_of_week)}</div>
-                  <div className="e">{a.emoji}</div>
-                  <div className="t">{m?.title ? tx(m.title) : '—'}</div>
+                <div key={g.key} className={`wday wday-multi ${isTodayCol ? 'today' : ''}`}>
+                  <div className="d">{dayShort(g.day)}</div>
+                  <ul className="wmeals">
+                    {g.meals.map(m => {
+                      const mt = m.meal_type || 'dinner';
+                      const isSel = selected && m.entry_id === selected.entry_id;
+                      return (
+                        <li key={m.entry_id} className={`wmeal ${isSel ? 'sel' : ''}`} onClick={() => setSelectedId(m.entry_id)} title={m?.title || ''}>
+                          <span className="wmeal-ico">{MEAL_EMOJI[mt]}</span>
+                          <span className="wmeal-t">{m?.title ? tx(m.title) : '—'}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               );
             })}

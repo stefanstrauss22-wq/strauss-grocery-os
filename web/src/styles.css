@@ -268,6 +268,16 @@ ul.items input[type="checkbox"] { width: 19px; height: 19px; accent-color: var(-
 .week-strip .e { font-size: 1.35rem; margin: 2px 0; }
 .week-strip .t { font-size: 0.66rem; color: var(--muted); line-height: 1.25; }
 
+/* Multi-meal day block: the day on top, then one tappable line per meal. */
+.week-strip .wday-multi { text-align: left; padding: 8px 9px; }
+.week-strip .wday-multi .d { text-align: center; margin-bottom: 5px; }
+.week-strip .wmeals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.week-strip .wmeal { display: flex; align-items: flex-start; gap: 5px; font-size: 0.66rem; line-height: 1.2; color: var(--muted); cursor: pointer; border-radius: 7px; padding: 3px 4px; transition: background 0.12s ease, color 0.12s ease; }
+.week-strip .wmeal:hover { background: var(--cream-2); }
+.week-strip .wmeal.sel { background: var(--marigold); color: var(--ink); font-weight: 600; }
+.week-strip .wmeal-ico { flex: none; }
+.week-strip .wmeal-t { flex: 1; }
+
 /* Per-serving nutrition strip on recipe cards / the dinner hero. */
 .nutrition { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 4px 0 12px; }
 .nutrition .nut-label { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
