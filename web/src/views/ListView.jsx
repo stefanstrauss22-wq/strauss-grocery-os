@@ -78,6 +78,18 @@ export default function ListView() {
     load();
   }
 
+  // Clear every meal-plan item off the list in one go (e.g. before sending a
+  // fresh plan, so old plan ingredients don't pile up).
+  async function clearMealPlan(arr) {
+    if (!arr.length) return;
+    if (!confirm(tr(
+      `Clear all ${arr.length} meal-plan item${arr.length > 1 ? 's' : ''} from the list?`,
+      `Maak al ${arr.length} etesplan-item${arr.length > 1 ? 's' : ''} van die lys af?`
+    ))) return;
+    await api.post('/items/bulk', { ids: arr.map(i => i.id), action: 'removed' });
+    load();
+  }
+
   const selCount = selected.size;
 
   return (
@@ -110,6 +122,9 @@ export default function ListView() {
             <div className="cat-head row" style={{ alignItems: 'center' }}>
               <span>{sourceLabel(tr, src)} <span className="muted">({arr.length})</span></span>
               <div className="spacer" />
+              {src === 'meal_plan' && (
+                <button className="ghost tiny" onClick={() => clearMealPlan(arr)}>{tr('🗑️ Clear all', '🗑️ Maak alles af')}</button>
+              )}
               <button className="ghost tiny" onClick={() => toggleSelectAll(arr)}>
                 {allSelected ? tr('Deselect all', 'Ontkies alles') : tr('Select all', 'Kies alles')}
               </button>
