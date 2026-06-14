@@ -31,20 +31,15 @@ export default function PlanView() {
   const [summary, setSummary] = useState(null);
   const [swapping, setSwapping] = useState(null);
 
-  const loadPlan = ws => api.get(`/plan/${ws}`).then(setPlan).catch(() => setPlan(null));
-
-  // On first load, show the CURRENT rolling plan — the one whose 7-day window
-  // covers today — and sync the date picker to its actual start date. A plan
-  // can start on any day, so an exact `/plan/{today}` match misses the day
-  // after it starts and the section looks empty.
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    api.get('/plan/current')
-      .then(p => { if (p?.week_start) setWeekStart(String(p.week_start).slice(0, 10)); })
-      .catch(() => {})
-      .finally(() => setReady(true));
-  }, []);
-  useEffect(() => { if (ready) loadPlan(weekStart); }, [weekStart, ready]);
+  // Show the plan for the selected start date; if none exists there yet, fall
+  // back to the current rolling plan so the active week stays visible. The date
+  // picker itself stays on TODAY, so "Generate/Regenerate" always builds a fresh
+  // 7 days from now (locked days in the window are kept by the server).
+  const loadPlan = async ws => {
+    try { setPlan(await api.get(`/plan/${ws}`)); }
+    catch { try { setPlan(await api.get('/plan/current')); } catch { setPlan(null); } }
+  };
+  useEffect(() => { loadPlan(weekStart); }, [weekStart]);
 
   // Generation/swap runs in the background on the server; poll the plan until
   // its status flips away from 'generating'. Resolves with the finished plan.

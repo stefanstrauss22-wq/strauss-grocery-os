@@ -65,6 +65,19 @@ async function persistGeneratedPlan(weekStart, context, generated, { replaceDay 
       planId = rows[0].id;
     }
   }
+  // Rolling regen: carry any LOCKED meal whose date falls in this 7-day window
+  // into this plan (even if it lived on a previous, differently-dated plan), so
+  // "keep my locked days" works as the start date rolls forward day to day.
+  if (!replaceDay) {
+    const windowDates = planWindow(weekStart).map(w => w.date);
+    await query(
+      `INSERT INTO meal_plan_entries (plan_id, day_of_week, recipe_id, locked, meal_date)
+       SELECT $1, e.day_of_week, e.recipe_id, true, e.meal_date
+       FROM meal_plan_entries e
+       WHERE e.locked = true AND e.meal_date = ANY($2::date[]) AND e.plan_id <> $1
+         AND NOT EXISTS (SELECT 1 FROM meal_plan_entries x WHERE x.plan_id = $1 AND x.day_of_week = e.day_of_week)`,
+      [planId, windowDates]);
+  }
   for (const meal of generated.meals) {
     if (replaceDay && meal.day !== replaceDay) continue;
     // skip locked entries on full regeneration
@@ -132,12 +145,13 @@ router.post('/generate', async (req, res, next) => {
       JOIN recipes r ON r.id = e.recipe_id
       JOIN meal_plans p ON p.id = e.plan_id
       WHERE p.week_start >= (DATE($1) - INTERVAL '21 days') AND p.week_start < DATE($1)`, [week_start]);
-    // Locked days in this window are kept verbatim — tell the planner so it fills
-    // only the open days and never duplicates a locked meal.
+    // Locked days anywhere in this 7-day window are kept verbatim — tell the
+    // planner so it fills only the open days and never duplicates a locked meal.
+    // Matched by date (not by plan) so locks survive the window rolling forward.
     const lockedRows = await query(`
-      SELECT e.day_of_week, e.meal_date, r.title FROM meal_plan_entries e
-      JOIN meal_plans p ON p.id = e.plan_id LEFT JOIN recipes r ON r.id = e.recipe_id
-      WHERE p.week_start = $1 AND e.locked = true`, [week_start]);
+      SELECT DISTINCT e.day_of_week, e.meal_date, r.title FROM meal_plan_entries e
+      LEFT JOIN recipes r ON r.id = e.recipe_id
+      WHERE e.locked = true AND e.meal_date = ANY($1::date[])`, [window.map(w => w.date)]);
     const lockedDays = lockedRows.rows.map(r => r.day_of_week);
     const context = {
       profile,
