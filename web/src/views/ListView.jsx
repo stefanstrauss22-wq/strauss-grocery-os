@@ -19,7 +19,7 @@ const CATEGORY_ICON = { produce: '🥕', meat: '🥩', dairy: '🥛', bakery: '�
 const CATEGORY_ORDER = ['produce', 'meat', 'dairy', 'bakery', 'pantry', 'frozen', 'household', 'toiletries', 'pet', 'other'];
 
 export default function ListView() {
-  const { tr } = useLang();
+  const { tr, unitWord } = useLang();
   const [items, setItems] = useState([]);
   const tx = useAutoTranslate(items.map(i => i.name)); // display item names in AF (data stays English)
   const [newItem, setNewItem] = useState('');
@@ -124,7 +124,7 @@ export default function ListView() {
                     {tx(item.name)}
                     {item.added_by ? <span className="muted"> — {item.added_by}</span> : null}
                   </span>
-                  <span className="qty">{Number(item.quantity)}{item.unit ? ` ${item.unit}` : '×'}</span>
+                  <span className="qty">{Number(item.quantity)}{item.unit ? ` ${unitWord(item.unit, Number(item.quantity))}` : '×'}</span>
                   <a className="ghost tiny" href={item.search_link} target="_blank" rel="noreferrer" title={tr('Search on Checkers', 'Soek op Checkers')}>🔎</a>
                   <button className="ghost tiny" onClick={() => check(item)} title={tr('Mark bought', 'Merk gekoop')}>✓</button>
                   <button className="ghost tiny" onClick={() => remove(item)} title={tr('Remove', 'Verwyder')}>✕</button>

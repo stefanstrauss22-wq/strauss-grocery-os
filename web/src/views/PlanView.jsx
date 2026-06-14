@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, todayISO, addDays, planWindow } from '../api.js';
 import { foodArt } from '../foodArt.js';
-import { useLang, useAutoTranslate } from '../i18n.jsx';
+import { useLang, useAutoTranslate, ingredientEnglish } from '../i18n.jsx';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const fmtDay = (iso, locale = 'en-ZA') => new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
@@ -41,7 +41,7 @@ export default function PlanView() {
   const [swapping, setSwapping] = useState(null);
   // Translate recipe text + ingredient names for display (data stays English).
   const tx = useAutoTranslate((plan?.meals || []).flatMap(m =>
-    [m.title, m.description, m.instructions, ...((m.ingredients || []).map(i => i.name))]));
+    [m.title, m.description, m.instructions, ...((m.ingredients || []).map(ingredientEnglish))]));
 
   // Show the plan for the selected start date; if none exists there yet, fall
   // back to the current rolling plan so the active week stays visible. The date
@@ -217,7 +217,7 @@ export default function PlanView() {
                     <summary>{tr('Recipe & ingredients', 'Resep & bestanddele')}</summary>
                     <ul className="muted" style={{ paddingLeft: 18 }}>
                       {meal.ingredients.map((ing, i) => (
-                        <li key={i}>{ing.quantity} {ing.unit || ''} {tx(ing.name)}</li>
+                        <li key={i}>{tx(ingredientEnglish(ing))}</li>
                       ))}
                     </ul>
                     <p className="muted" style={{ whiteSpace: 'pre-wrap' }}>{tx(meal.instructions)}</p>

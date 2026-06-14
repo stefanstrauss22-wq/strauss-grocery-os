@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api, todayISO } from '../api.js';
 import { foodArt } from '../foodArt.js';
 import TodoList from './TodoList.jsx';
-import { useLang, useAutoTranslate } from '../i18n.jsx';
+import { useLang, useAutoTranslate, ingredientEnglish } from '../i18n.jsx';
 
 const isoDate = v => String(v).slice(0, 10);
 
@@ -23,7 +23,7 @@ export default function Dashboard({ goTo }) {
 
   // Translate recipe text + ingredient names for display (data stays English).
   const tx = useAutoTranslate((plan?.meals || []).flatMap(m =>
-    [m.title, m.description, m.instructions, ...((m.ingredients || []).map(i => i.name))]));
+    [m.title, m.description, m.instructions, ...((m.ingredients || []).map(ingredientEnglish))]));
 
   if (err) return <div className="error-box">{err}</div>;
   if (!data) return <p className="muted">{tr('Setting the table…', 'Ons dek die tafel…')}</p>;
@@ -75,7 +75,7 @@ export default function Dashboard({ goTo }) {
                     <h4 style={{ margin: '0 0 6px' }}>{tr('Ingredients', 'Bestanddele')}</h4>
                     <ul className="muted" style={{ paddingLeft: 18, margin: '0 0 12px' }}>
                       {selected.ingredients.map((ing, i) => (
-                        <li key={i}>{Number(ing.quantity)} {ing.unit || ''} {tx(ing.name)}</li>
+                        <li key={i}>{tx(ingredientEnglish(ing))}</li>
                       ))}
                     </ul>
                   </>

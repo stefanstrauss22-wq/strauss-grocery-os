@@ -64,6 +64,22 @@ const DAY_LONG_AF = { Monday: 'Maandag', Tuesday: 'Dinsdag', Wednesday: 'Woensda
 const DAY_SHORT_AF = { Monday: 'Ma', Tuesday: 'Di', Wednesday: 'Wo', Thursday: 'Do', Friday: 'Vr', Saturday: 'Sa', Sunday: 'So' };
 const DAY_SHORT_EN = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun' };
 
+// Generic "count" units that read badly spelled out ("3 unit onion") — for
+// recipe lines we drop them and let the phrase translate naturally ("3 uie").
+const COUNT_UNITS = new Set(['unit', 'units', 'each', 'ea', 'x', '']);
+// Unit words for the list/staples quantity column (where name is shown separately).
+const UNIT_AF = { unit: 'eenhede', units: 'eenhede', pack: 'pak', packs: 'pak', bottle: 'bottel', bottles: 'bottel', tin: 'blik', tins: 'blik', can: 'blik', loaf: 'brood', loaves: 'brood' };
+
+/** English ingredient phrase for display/translation, dropping the vague "unit"
+ *  unit so it reads naturally (e.g. "3 onion" → translates to "3 uie"). */
+export function ingredientEnglish(ing) {
+  const qn = Number(ing.quantity);
+  const q = Number.isFinite(qn) ? (Math.round(qn * 100) / 100) : ing.quantity;
+  const unit = (ing.unit || '').toString().toLowerCase().trim();
+  if (!unit || COUNT_UNITS.has(unit)) return `${q} ${ing.name}`;
+  return `${q} ${ing.unit} ${ing.name}`;
+}
+
 export function useLang() {
   const ctx = useContext(LangContext);
   const af = ctx.lang === 'af';
@@ -71,7 +87,14 @@ export function useLang() {
   const locale = af ? 'af-ZA' : 'en-ZA';
   const dayLong = en => (af ? (DAY_LONG_AF[en] || en) : en);
   const dayShort = en => (af ? (DAY_SHORT_AF[en] || en) : (DAY_SHORT_EN[en] || en));
-  return { ...ctx, tr, locale, dayLong, dayShort };
+  // Translate a unit word for the quantity column (singular "eenheid" at qty 1).
+  const unitWord = (unit, qty) => {
+    if (!af || !unit) return unit;
+    const u = unit.toString().toLowerCase().trim();
+    if ((u === 'unit' || u === 'units') && Number(qty) === 1) return 'eenheid';
+    return UNIT_AF[u] || unit;
+  };
+  return { ...ctx, tr, locale, dayLong, dayShort, unitWord };
 }
 
 /**

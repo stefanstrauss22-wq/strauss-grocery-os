@@ -7,7 +7,7 @@ const KIND_LABEL = { fixed: 'staple', rotation: 'rotation', custom: 'added', lea
 const KIND_ORDER = ['fixed', 'rotation', 'learned', 'custom'];
 
 export default function StaplesView() {
-  const { tr } = useLang();
+  const { tr, unitWord } = useLang();
   const [staples, setStaples] = useState([]);
   const tx = useAutoTranslate(staples.map(s => s.name)); // display staple names in AF (data stays English)
   const [newItem, setNewItem] = useState('');
@@ -111,7 +111,7 @@ export default function StaplesView() {
                   onChange={e => setQty(s, Number(e.target.value))}
                   style={{ width: 56 }} title={tr('Quantity', 'Hoeveelheid')}
                 />
-                <span className="qty">{s.unit || '×'}</span>
+                <span className="qty">{s.unit ? unitWord(s.unit, Number(s.quantity)) : '×'}</span>
                 <button className="ghost tiny" onClick={() => remove(s)} title={tr('Remove from staples', 'Verwyder uit noodsaaklikhede')}>✕</button>
               </li>
             ))}
