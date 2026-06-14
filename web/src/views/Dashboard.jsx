@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { api, todayISO } from '../api.js';
-import { foodArt, dayShort } from '../foodArt.js';
+import { foodArt } from '../foodArt.js';
 import TodoList from './TodoList.jsx';
 import { useLang } from '../i18n.jsx';
 
 const isoDate = v => String(v).slice(0, 10);
 
 export default function Dashboard({ goTo }) {
-  const { tr, locale } = useLang();
+  const { tr, locale, dayShort, dayLong } = useLang();
   const [data, setData] = useState(null);
   const [plan, setPlan] = useState(null);
   const [items, setItems] = useState([]);
@@ -49,7 +49,7 @@ export default function Dashboard({ goTo }) {
       {selected ? (
         <div className="hero">
           <div className="hero-art" style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
-            <span className="kicker">{isToday(selected) ? tr("Tonight's dinner", 'Vanaand se aandete') : tr(`${selected.day_of_week}'s dinner`, `${selected.day_of_week} se aandete`)}</span>
+            <span className="kicker">{isToday(selected) ? tr("Tonight's dinner", 'Vanaand se aandete') : tr(`${selected.day_of_week}'s dinner`, `${dayLong(selected.day_of_week)} se aandete`)}</span>
             <span className="emoji">{art.emoji}</span>
           </div>
           <div className="hero-body">

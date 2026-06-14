@@ -131,7 +131,7 @@ async function setPlanStatus(weekStart, status, extra = {}) {
 // until status flips from 'generating' to 'active' (or 'error').
 router.post('/generate', async (req, res, next) => {
   try {
-    const { week_start, week = {} } = req.body;
+    const { week_start, week = {}, language = 'en' } = req.body;
     if (!week_start) return res.status(400).json({ error: 'week_start (start date, YYYY-MM-DD) is required' });
 
     const window = planWindow(week_start); // 7 days from the chosen start, any weekday
@@ -155,6 +155,7 @@ router.post('/generate', async (req, res, next) => {
     const lockedDays = lockedRows.rows.map(r => r.day_of_week);
     const context = {
       profile,
+      language, // 'en' | 'af' — recipe prose language (ingredient names stay English)
       week: {
         ...week,
         days: window,

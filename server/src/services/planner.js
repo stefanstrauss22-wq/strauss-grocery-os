@@ -65,6 +65,14 @@ Principles:
 - If some days are already locked, those meals are fixed: do NOT plan or duplicate them — only fill the open days, and avoid repeating the locked meals.
 - The weekend / Sunday is the big family meal unless told otherwise.`;
 
+// When the family is using the app in Afrikaans, write the recipe prose in
+// Afrikaans — but keep ingredient `name` fields in lowercase English shoppable
+// form, because they feed the shopping list and the Sixty60 product matching.
+function languageInstruction(context) {
+  if (context.language !== 'af') return '';
+  return `\n\nLANGUAGE: Write all human-facing text in AFRIKAANS — the meal "title", "description", "instructions", "tags" and "week_summary". HOWEVER, each ingredient "name" MUST stay in lowercase ENGLISH, shoppable supermarket form (e.g. "chicken thighs", "basmati rice", "brown bread") — do NOT translate ingredient names; they are used to match Checkers products. "cuisine" may stay in its usual form.`;
+}
+
 export async function generatePlan(context) {
   const stream = claude().messages.stream({
     model: config.plannerModel,
@@ -73,7 +81,7 @@ export async function generatePlan(context) {
     system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
     messages: [{
       role: 'user',
-      content: `Plan dinners for this 7-day run. Plan ONLY the days listed in "days_to_plan" (each with its date + weekday); copy nothing for the "locked_days" — those are already fixed and must not be repeated. Return one meal object per day you plan, keyed by its weekday name.\n\nHousehold profile:\n${JSON.stringify(context.profile || {}, null, 2)}\n\nThis run's context (the 7 dates, which days to plan vs locked, budget in Rand, schedule per weekday, mood chips, items already at home, recent meals to avoid repeating, favourites to consider):\n${JSON.stringify(context.week || {}, null, 2)}`
+      content: `Plan dinners for this 7-day run. Plan ONLY the days listed in "days_to_plan" (each with its date + weekday); copy nothing for the "locked_days" — those are already fixed and must not be repeated. Return one meal object per day you plan, keyed by its weekday name.\n\nHousehold profile:\n${JSON.stringify(context.profile || {}, null, 2)}\n\nThis run's context (the 7 dates, which days to plan vs locked, budget in Rand, schedule per weekday, mood chips, items already at home, recent meals to avoid repeating, favourites to consider):\n${JSON.stringify(context.week || {}, null, 2)}${languageInstruction(context)}`
     }],
     output_config: { format: { type: 'json_schema', schema: PLAN_SCHEMA } },
   });
@@ -90,7 +98,7 @@ export async function swapMeal(context, currentPlan, day, reason) {
     system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
     messages: [{
       role: 'user',
-      content: `Here is the current week plan:\n${JSON.stringify(currentPlan, null, 2)}\n\nReplace ONLY the meal for ${day}. Reason for the swap: "${reason || 'family wants something different'}".\nThe replacement must not duplicate any other meal this week and must satisfy the same constraints:\n${JSON.stringify(context, null, 2)}\n\nReturn a full plan object but change only the ${day} entry; copy the other days through unchanged.`
+      content: `Here is the current week plan:\n${JSON.stringify(currentPlan, null, 2)}\n\nReplace ONLY the meal for ${day}. Reason for the swap: "${reason || 'family wants something different'}".\nThe replacement must not duplicate any other meal this week and must satisfy the same constraints:\n${JSON.stringify(context, null, 2)}\n\nReturn a full plan object but change only the ${day} entry; copy the other days through unchanged.${languageInstruction(context)}`
     }],
     output_config: { format: { type: 'json_schema', schema: PLAN_SCHEMA } },
   });

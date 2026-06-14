@@ -4,11 +4,10 @@ import { foodArt } from '../foodArt.js';
 import { useLang } from '../i18n.jsx';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const SHORT = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun' };
 const fmtDay = (iso, locale = 'en-ZA') => new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 
 export default function PlanView() {
-  const { tr, locale } = useLang();
+  const { tr, locale, lang, dayShort, dayLong } = useLang();
   // One dropdown per night: cooking effort + the meal-type themes, in one control.
   const NIGHT_OPTIONS = [
     { value: 'normal',    label: tr('🍳 Normal', '🍳 Normaal') },
@@ -86,6 +85,7 @@ export default function PlanView() {
     try {
       await api.post('/plan/generate', {
         week_start: weekStart,
+        language: lang, // recipes written in this language; ingredient names stay English
         week: {
           budget_rand: budget,
           schedule,
@@ -149,7 +149,7 @@ export default function PlanView() {
         <div className="night-list">
           {windowDays.map(w => (
             <div key={w.date} className="night-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
-              <span style={{ minWidth: 92, fontWeight: 600 }}>{SHORT[w.weekday]} {fmtDay(w.date, locale)}</span>
+              <span style={{ minWidth: 92, fontWeight: 600 }}>{dayShort(w.weekday)} {fmtDay(w.date, locale)}</span>
               <select className="night-select" style={{ flex: 1, padding: '8px 10px' }}
                 value={schedule[w.weekday]} onChange={e => setNight(w.weekday, e.target.value)}>
                 {NIGHT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -193,7 +193,7 @@ export default function PlanView() {
               return (
               <div key={meal.entry_id} className={`meal-card ${meal.locked ? 'locked' : ''}`}>
                 <div className="meal-art" style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
-                  <span className="day-pill">{meal.day_of_week}{meal.meal_date ? ` · ${fmtDay(meal.meal_date, locale)}` : ''}</span>
+                  <span className="day-pill">{dayLong(meal.day_of_week)}{meal.meal_date ? ` · ${fmtDay(meal.meal_date, locale)}` : ''}</span>
                   {meal.locked && <span className="lock-pill">📌</span>}
                   <span className="emoji">{art.emoji}</span>
                 </div>
