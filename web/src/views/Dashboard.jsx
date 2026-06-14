@@ -10,6 +10,7 @@ export default function Dashboard({ goTo }) {
   const [plan, setPlan] = useState(null);
   const [items, setItems] = useState([]);
   const [showRecipe, setShowRecipe] = useState(false);
+  const [selectedId, setSelectedId] = useState(null); // which day's meal the hero shows
   const [err, setErr] = useState(null);
 
   useEffect(() => {
@@ -23,8 +24,10 @@ export default function Dashboard({ goTo }) {
 
   const meals = plan?.meals || []; // server returns these in date order
   const isToday = m => m.meal_date && isoDate(m.meal_date) === todayISO();
-  const tonight = meals.find(isToday) || meals[0];
-  const art = tonight ? foodArt(tonight) : null;
+  const todayMeal = meals.find(isToday) || meals[0];
+  // The hero shows today's meal by default, or whichever day you tap in the strip.
+  const selected = meals.find(m => m.entry_id === selectedId) || todayMeal;
+  const art = selected ? foodArt(selected) : null;
 
   // Budget insight: planned cost vs the week's budget from the wizard
   const ctx = plan ? (typeof plan.context === 'string' ? JSON.parse(plan.context) : plan.context) : null;
@@ -40,20 +43,20 @@ export default function Dashboard({ goTo }) {
 
   return (
     <div>
-      {/* Tonight's dinner hero */}
-      {tonight ? (
+      {/* Selected day's dinner hero (defaults to today; tap a day below to change) */}
+      {selected ? (
         <div className="hero">
           <div className="hero-art" style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
-            <span className="kicker">{isToday(tonight) ? "Tonight's dinner" : `${tonight.day_of_week}'s dinner`}</span>
+            <span className="kicker">{isToday(selected) ? "Tonight's dinner" : `${selected.day_of_week}'s dinner`}</span>
             <span className="emoji">{art.emoji}</span>
           </div>
           <div className="hero-body">
-            <h2>{tonight.title}</h2>
-            <p>{tonight.description}</p>
+            <h2>{selected.title}</h2>
+            <p>{selected.description}</p>
             <div className="row">
-              <span className="tag">⏱ {(tonight.prep_minutes || 0) + (tonight.cook_minutes || 0)} min</span>
-              <span className="tag terra">💰 ~R{Math.round((tonight.est_cost_cents || 0) / 100)}</span>
-              {tonight.cuisine && <span className="tag gold">{tonight.cuisine}</span>}
+              <span className="tag">⏱ {(selected.prep_minutes || 0) + (selected.cook_minutes || 0)} min</span>
+              <span className="tag terra">💰 ~R{Math.round((selected.est_cost_cents || 0) / 100)}</span>
+              {selected.cuisine && <span className="tag gold">{selected.cuisine}</span>}
               <div className="spacer" />
               <button className="ghost" onClick={() => setShowRecipe(v => !v)}>
                 {showRecipe ? 'Hide recipe ▲' : 'See the recipe →'}
@@ -61,23 +64,23 @@ export default function Dashboard({ goTo }) {
             </div>
             {showRecipe && (
               <div className="recipe-expand" style={{ marginTop: 12 }}>
-                {tonight.ingredients?.length > 0 && (
+                {selected.ingredients?.length > 0 && (
                   <>
                     <h4 style={{ margin: '0 0 6px' }}>Ingredients</h4>
                     <ul className="muted" style={{ paddingLeft: 18, margin: '0 0 12px' }}>
-                      {tonight.ingredients.map((ing, i) => (
+                      {selected.ingredients.map((ing, i) => (
                         <li key={i}>{Number(ing.quantity)} {ing.unit || ''} {ing.name}</li>
                       ))}
                     </ul>
                   </>
                 )}
-                {tonight.instructions && (
+                {selected.instructions && (
                   <>
                     <h4 style={{ margin: '0 0 6px' }}>Method</h4>
-                    <p className="muted" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{tonight.instructions}</p>
+                    <p className="muted" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{selected.instructions}</p>
                   </>
                 )}
-                {!tonight.ingredients?.length && !tonight.instructions && (
+                {!selected.ingredients?.length && !selected.instructions && (
                   <p className="muted" style={{ margin: 0 }}>No recipe details for this one — it's a no-cook / leftovers night.</p>
                 )}
               </div>
@@ -97,15 +100,17 @@ export default function Dashboard({ goTo }) {
         </div>
       )}
 
-      {/* Week at a glance */}
+      {/* Week at a glance — tap a day to show its meal in the card above */}
       {meals.length > 0 && (
         <div className="card">
           <h2>The week at a glance</h2>
+          <p className="muted" style={{ margin: '0 0 6px' }}>Tap a day to see its dinner above.</p>
           <div className="week-strip" style={{ marginTop: 10 }}>
             {meals.map(m => {
               const a = foodArt(m);
+              const isSel = selected && m.entry_id === selected.entry_id;
               return (
-                <div key={m.entry_id} className={`wday ${isToday(m) ? 'today' : ''}`} onClick={() => goTo('plan')} title={m?.title || ''}>
+                <div key={m.entry_id} className={`wday ${isSel ? 'today' : ''}`} onClick={() => setSelectedId(m.entry_id)} title={m?.title || ''}>
                   <div className="d">{dayShort(m.day_of_week)}</div>
                   <div className="e">{a.emoji}</div>
                   <div className="t">{m?.title || '—'}</div>
