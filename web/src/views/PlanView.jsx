@@ -160,8 +160,8 @@ export default function PlanView() {
           </label>
         </div>
         <div className="field" style={{ marginTop: 8 }}>
-          <span>{tr('How far ahead?', 'Hoe ver vooruit?')}</span>
-          <div className="seg-toggle" role="group" aria-label={tr('Planning length', 'Beplanningslengte')} style={{ marginTop: 6 }}>
+          <span style={{ display: 'block' }}>{tr('How far ahead?', 'Hoe ver vooruit?')}</span>
+          <div className="seg-toggle" role="group" aria-label={tr('Planning length', 'Beplanningslengte')} style={{ marginTop: 14 }}>
             <button type="button" className={horizon === 3 ? 'active' : ''} onClick={() => setHorizon(3)}>{tr('Next 3 days', 'Volgende 3 dae')}</button>
             <button type="button" className={horizon === 7 ? 'active' : ''} onClick={() => setHorizon(7)}>{tr('Next 7 days', 'Volgende 7 dae')}</button>
           </div>
