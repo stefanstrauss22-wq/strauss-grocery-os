@@ -38,7 +38,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <SpensIcon size={42} title="Spens" />
           <div>
-            <h1>{tr('Morning Strausses!', 'Môre Strausse!')}</h1>
+            <h1>{tr('Morning Strausse!', 'Môre Strausse!')}</h1>
             <div className="sub">{tr("What's cooking this week?", 'Wat kook ons hierdie week?')}</div>
           </div>
         </div>
