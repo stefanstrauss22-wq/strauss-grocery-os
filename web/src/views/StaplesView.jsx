@@ -51,6 +51,13 @@ export default function StaplesView() {
     setBusy(false);
   }
 
+  // Tick / untick every staple in a category at once.
+  async function toggleAll(arr) {
+    const target = !arr.every(s => s.active);
+    await Promise.all(arr.filter(s => s.active !== target).map(s => api.patch(`/staples/${s.id}`, { active: target })));
+    load();
+  }
+
   const grouped = KIND_ORDER
     .map(k => [k, staples.filter(s => s.kind === k)])
     .filter(([, arr]) => arr.length);
@@ -79,9 +86,15 @@ export default function StaplesView() {
       {err && <div className="error-box">{err}</div>}
       {msg && <p className="muted">{msg}</p>}
 
-      {grouped.map(([kind, arr]) => (
+      {grouped.map(([kind, arr]) => {
+        const allActive = arr.every(s => s.active);
+        return (
         <div key={kind}>
-          <div className="cat-head">{KIND_LABEL[kind] === 'rotation' ? '🎲 This week\'s rotation' : KIND_LABEL[kind] === 'suggested' ? '💡 Suggested from your buying' : kind === 'custom' ? '✏️ Added by you' : '🧺 Fixed staples'}</div>
+          <div className="cat-head row" style={{ alignItems: 'center' }}>
+            <span>{KIND_LABEL[kind] === 'rotation' ? '🎲 This week\'s rotation' : KIND_LABEL[kind] === 'suggested' ? '💡 Suggested from your buying' : kind === 'custom' ? '✏️ Added by you' : '🧺 Fixed staples'}</span>
+            <div className="spacer" />
+            <button className="ghost tiny" onClick={() => toggleAll(arr)}>{allActive ? 'Deselect all' : 'Select all'}</button>
+          </div>
           <ul className="items">
             {arr.map(s => (
               <li key={s.id} className={s.active ? '' : 'muted'}>
@@ -101,7 +114,8 @@ export default function StaplesView() {
             ))}
           </ul>
         </div>
-      ))}
+        );
+      })}
       {!staples.length && <p className="muted">No staples yet. They seed from your shopping preferences, or add your own above.</p>}
     </div>
   );
