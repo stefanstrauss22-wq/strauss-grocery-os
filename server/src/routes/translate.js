@@ -17,7 +17,7 @@ const SCHEMA = {
 async function translateBatch(strings) {
   const msg = await claude().messages.create({
     model: config.extractionModel,
-    max_tokens: 8000,
+    max_tokens: 16000,
     system: 'You translate English UI text, recipe titles/descriptions/cooking steps, and grocery ingredient names into natural South African Afrikaans for a family meal-planning app. You are given a JSON array of English strings. Return a "translations" array of the SAME LENGTH and SAME ORDER, each being the Afrikaans translation of the input at that position. Translate meaning faithfully and concisely; keep numbers, measurements/units and brand names unchanged.',
     messages: [{ role: 'user', content: JSON.stringify(strings) }],
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
@@ -44,8 +44,10 @@ router.post('/', async (req, res, next) => {
 
     const missing = uniq.filter(s => cached[s] === undefined);
     if (missing.length && aiEnabled()) {
-      // Chunk so a single AI call never grows large enough to truncate.
-      const CHUNK = 25;
+      // Chunk so a single AI call never grows large enough to truncate. Kept
+      // small because recipe method texts are long — a big batch of them could
+      // overflow the output budget and fail, leaving those strings in English.
+      const CHUNK = 12;
       for (let i = 0; i < missing.length; i += CHUNK) {
         const part = missing.slice(i, i + CHUNK);
         let arr = [];

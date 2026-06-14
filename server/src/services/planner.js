@@ -79,12 +79,15 @@ Principles:
 - If some days are already locked, those meals are fixed: do NOT plan or duplicate them — only fill the open days, and avoid repeating the locked meals.
 - The weekend / Sunday is the big family meal unless told otherwise.`;
 
-// When the family is using the app in Afrikaans, write the recipe prose in
-// Afrikaans — but keep ingredient `name` fields in lowercase English shoppable
-// form, because they feed the shopping list and the Sixty60 product matching.
-function languageInstruction(context) {
-  if (context.language !== 'af') return '';
-  return `\n\nLANGUAGE: Write all human-facing text in AFRIKAANS — the meal "title", "description", "instructions", "tags" and "week_summary". HOWEVER, each ingredient "name" MUST stay in lowercase ENGLISH, shoppable supermarket form (e.g. "chicken thighs", "basmati rice", "brown bread") — do NOT translate ingredient names; they are used to match Checkers products. "cuisine" may stay in its usual form.`;
+// Recipes are ALWAYS authored and stored in English (canonical). Afrikaans is
+// produced at display time by the /api/translate layer and cached, so both
+// languages stay consistent and Sixty60 always has English ingredient names.
+// Generating prose directly in Afrikaans is intentionally NOT done: it would be
+// fed back through the English→Afrikaans display translator and round-trip into
+// English. The `language` context field is kept for reference but no longer
+// changes how the plan is generated.
+function languageInstruction() {
+  return '';
 }
 
 export async function generatePlan(context) {
