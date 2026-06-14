@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { useLang } from './i18n.jsx';
-import SpensIcon from './components/SpensIcon.jsx';
+import SjeffieIcon from './components/SjeffieIcon.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import PlanView from './views/PlanView.jsx';
 import ListView from './views/ListView.jsx';
@@ -34,7 +34,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <SpensIcon size={42} title="Spens" />
+          <SjeffieIcon size={42} title="Sjeffie" />
           <div>
             <h1>{tr('Morning Strausse!', 'Môre Strausse!')}</h1>
             <div className="sub">{tr("What's cooking this week?", 'Wat kook ons hierdie week?')}</div>
