@@ -1,6 +1,6 @@
 {
-  "name": "Strauss Grocery OS",
-  "short_name": "Grocery OS",
+  "name": "Pantry",
+  "short_name": "Pantry",
   "description": "Family meal planning and grocery automation",
   "start_url": "/",
   "display": "standalone",
