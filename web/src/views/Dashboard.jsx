@@ -103,7 +103,7 @@ export default function Dashboard({ goTo }) {
           </div>
           <div className="hero-body">
             <h2>{tr('No plan for this week yet', 'Nog geen plan vir hierdie week nie')}</h2>
-            <p>{tr('Two minutes with the weekly wizard and dinner is sorted — budget, busy nights, braai and all.', 'Twee minute met die weeklikse towenaar en aandete is gereël — begroting, besige aande, braai en als.')}</p>
+            <p>{tr('Two minutes with the weekly wizard and dinner is sorted — budget, busy nights, braai and all.', 'Twee minute met die week beplanner en aandete is gereël — begroting, besige aande, braai en als.')}</p>
             <button className="primary terra" onClick={() => goTo('plan')}>{tr("Plan this week's dinners", 'Beplan hierdie week se aandetes')}</button>
           </div>
         </div>
@@ -146,7 +146,7 @@ export default function Dashboard({ goTo }) {
           ) : (
             <>
               <div className="t-value">—</div>
-              <div className="t-sub">{tr('Set a budget in the weekly wizard', 'Stel ’n begroting in die weeklikse towenaar')}</div>
+              <div className="t-sub">{tr('Set a budget in the weekly wizard', 'Stel ’n begroting in die week beplanner')}</div>
             </>
           )}
         </div>

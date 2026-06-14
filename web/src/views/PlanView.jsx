@@ -150,7 +150,7 @@ export default function PlanView() {
   return (
     <div>
       <div className="card">
-        <h2>{tr('Weekly wizard', 'Weeklikse towenaar')}</h2>
+        <h2>{tr('Weekly wizard', 'Week beplanner')}</h2>
         <div className="grid cols2">
           <label className="field">{tr('Plan starting', 'Plan begin')}
             <input type="date" value={weekStart} onChange={e => setWeekStart(e.target.value)} />
