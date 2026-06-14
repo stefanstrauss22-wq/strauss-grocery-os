@@ -34,7 +34,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <SjeffieIcon size={42} title="Sjeffie" />
+          <SjeffieIcon size={56} title="Sjeffie" />
           <div>
             <h1>{tr('Morning Strausse!', 'Môre Strausse!')}</h1>
             <div className="sub">{tr("What's cooking this week?", 'Wat kook ons hierdie week?')}</div>
