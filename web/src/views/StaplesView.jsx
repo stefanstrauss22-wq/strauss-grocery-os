@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { useLang } from '../i18n.jsx';
 
 const CATEGORY_ICON = { produce: '🥕', meat: '🥩', dairy: '🥛', bakery: '🍞', pantry: '🥫', frozen: '🧊', household: '🧴', toiletries: '🧻', pet: '🐶', other: '📦' };
 const KIND_LABEL = { fixed: 'staple', rotation: 'rotation', custom: 'added', learned: 'suggested' };
 const KIND_ORDER = ['fixed', 'rotation', 'learned', 'custom'];
 
 export default function StaplesView() {
+  const { tr } = useLang();
   const [staples, setStaples] = useState([]);
   const [newItem, setNewItem] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,7 +38,7 @@ export default function StaplesView() {
     setBusy(true); setErr(null); setMsg(null);
     try {
       const r = await api.post('/staples/rotate', {});
-      setMsg(`Fresh rotation picks: ${r.picks.join(', ')}`);
+      setMsg(tr(`Fresh rotation picks: ${r.picks.join(', ')}`, `Vars roterende keuses: ${r.picks.join(', ')}`));
       load();
     } catch (e) { setErr(e.message); }
     setBusy(false);
@@ -46,7 +48,7 @@ export default function StaplesView() {
     setBusy(true); setErr(null); setMsg(null);
     try {
       const r = await api.post('/staples/to-list', {});
-      setMsg(`Sent to shopping list: ${r.added} added, ${r.skipped} already on the list.`);
+      setMsg(tr(`Sent to shopping list: ${r.added} added, ${r.skipped} already on the list.`, `Na inkopielys gestuur: ${r.added} bygevoeg, ${r.skipped} reeds op die lys.`));
     } catch (e) { setErr(e.message); }
     setBusy(false);
   }
@@ -66,21 +68,21 @@ export default function StaplesView() {
   return (
     <div className="card">
       <div className="row">
-        <h2>Weekly staples</h2>
+        <h2>{tr('Weekly staples', 'Weeklikse noodsaaklikhede')}</h2>
         <div className="spacer" />
-        <span className="muted">{activeCount} of {staples.length} ticked</span>
+        <span className="muted">{tr(`${activeCount} of ${staples.length} ticked`, `${activeCount} van ${staples.length} gemerk`)}</span>
       </div>
-      <p className="muted">Your standing weekly order. Tick what you want, tweak quantities, then send it across to the shopping list — nothing here touches the list until you do.</p>
+      <p className="muted">{tr('Your standing weekly order. Tick what you want, tweak quantities, then send it across to the shopping list — nothing here touches the list until you do.', 'Jou vaste weeklikse bestelling. Merk wat jy wil hê, pas hoeveelhede aan en stuur dit dan na die inkopielys — niks hier raak die lys totdat jy dit doen nie.')}</p>
 
       <form onSubmit={add} className="chat-input">
-        <input type="text" placeholder="Add a staple… (e.g. 6 bananas)" value={newItem} onChange={e => setNewItem(e.target.value)} />
-        <button className="primary" type="submit">Add</button>
+        <input type="text" placeholder={tr('Add a staple… (e.g. 6 bananas)', 'Voeg \'n noodsaaklikheid by… (bv. 6 piesangs)')} value={newItem} onChange={e => setNewItem(e.target.value)} />
+        <button className="primary" type="submit">{tr('Add', 'Voeg by')}</button>
       </form>
 
       <div className="row" style={{ gap: 8, margin: '10px 0' }}>
-        <button className="ghost" disabled={busy} onClick={rotate}>{busy ? '⏳ working…' : '🎲 Refresh rotation picks'}</button>
+        <button className="ghost" disabled={busy} onClick={rotate}>{busy ? tr('⏳ working…', '⏳ besig…') : tr('🎲 Refresh rotation picks', '🎲 Verfris roterende keuses')}</button>
         <div className="spacer" />
-        <button className="primary" disabled={busy || !activeCount} onClick={toList}>Send ticked items to shopping list →</button>
+        <button className="primary" disabled={busy || !activeCount} onClick={toList}>{tr('Send ticked items to shopping list →', 'Stuur gemerkte items na inkopielys →')}</button>
       </div>
 
       {err && <div className="error-box">{err}</div>}
@@ -91,14 +93,14 @@ export default function StaplesView() {
         return (
         <div key={kind}>
           <div className="cat-head row" style={{ alignItems: 'center' }}>
-            <span>{KIND_LABEL[kind] === 'rotation' ? '🎲 This week\'s rotation' : KIND_LABEL[kind] === 'suggested' ? '💡 Suggested from your buying' : kind === 'custom' ? '✏️ Added by you' : '🧺 Fixed staples'}</span>
+            <span>{KIND_LABEL[kind] === 'rotation' ? tr('🎲 This week\'s rotation', '🎲 Hierdie week se rotasie') : KIND_LABEL[kind] === 'suggested' ? tr('💡 Suggested from your buying', '💡 Voorgestel uit jou aankope') : kind === 'custom' ? tr('✏️ Added by you', '✏️ Deur jou bygevoeg') : tr('🧺 Fixed staples', '🧺 Vaste noodsaaklikhede')}</span>
             <div className="spacer" />
-            <button className="ghost tiny" onClick={() => toggleAll(arr)}>{allActive ? 'Deselect all' : 'Select all'}</button>
+            <button className="ghost tiny" onClick={() => toggleAll(arr)}>{allActive ? tr('Deselect all', 'Ontmerk almal') : tr('Select all', 'Merk almal')}</button>
           </div>
           <ul className="items">
             {arr.map(s => (
               <li key={s.id} className={s.active ? '' : 'muted'}>
-                <input type="checkbox" checked={s.active} onChange={() => toggle(s)} title="Include in the order" />
+                <input type="checkbox" checked={s.active} onChange={() => toggle(s)} title={tr('Include in the order', 'Sluit in die bestelling in')} />
                 <span className="name">
                   <span title={s.category}>{CATEGORY_ICON[s.category] || '📦'}</span> {s.name}
                   {s.note ? <span className="muted"> — {s.note}</span> : null}
@@ -106,17 +108,17 @@ export default function StaplesView() {
                 <input
                   type="number" min="0" step="1" className="qty-input" value={Number(s.quantity)}
                   onChange={e => setQty(s, Number(e.target.value))}
-                  style={{ width: 56 }} title="Quantity"
+                  style={{ width: 56 }} title={tr('Quantity', 'Hoeveelheid')}
                 />
                 <span className="qty">{s.unit || '×'}</span>
-                <button className="ghost tiny" onClick={() => remove(s)} title="Remove from staples">✕</button>
+                <button className="ghost tiny" onClick={() => remove(s)} title={tr('Remove from staples', 'Verwyder uit noodsaaklikhede')}>✕</button>
               </li>
             ))}
           </ul>
         </div>
         );
       })}
-      {!staples.length && <p className="muted">No staples yet. They seed from your shopping preferences, or add your own above.</p>}
+      {!staples.length && <p className="muted">{tr('No staples yet. They seed from your shopping preferences, or add your own above.', 'Nog geen noodsaaklikhede nie. Hulle word vanuit jou inkopievoorkeure gevul, of voeg jou eie hierbo by.')}</p>}
     </div>
   );
 }

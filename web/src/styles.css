@@ -54,7 +54,10 @@ h1, h2, h3, .display { font-family: var(--font-display); letter-spacing: -0.01em
 .topbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 22px 2px 6px; }
 .topbar h1 { font-size: 1.5rem; margin: 0; font-weight: 600; }
 .topbar .sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
-.badges { display: flex; gap: 6px; }
+.badges { display: flex; gap: 6px; align-items: center; }
+.lang-toggle { display: inline-flex; border: 1px solid var(--line, #e3dccd); border-radius: 999px; overflow: hidden; }
+.lang-toggle button { border: none; background: var(--cream-2); color: var(--muted); font-size: 0.7rem; font-weight: 700; padding: 4px 9px; cursor: pointer; }
+.lang-toggle button.active { background: var(--terra); color: #fff; }
 .badge { font-size: 0.7rem; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--cream-2); color: var(--muted); }
 .badge.ok { background: var(--sage-soft); color: var(--sage-dark); }
 .badge.warn { background: var(--gold-soft); color: #9a7218; }

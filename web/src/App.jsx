@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from './api.js';
+import { useLang } from './i18n.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import PlanView from './views/PlanView.jsx';
 import ListView from './views/ListView.jsx';
@@ -9,28 +10,30 @@ import CatalogView from './views/CatalogView.jsx';
 import WhatsAppSim from './views/WhatsAppSim.jsx';
 import SettingsView from './views/SettingsView.jsx';
 
+// [id, icon, English label, Afrikaans label]
 const TABS = [
-  ['dashboard', '🏠', 'Home'],
-  ['plan', '🍽️', 'Plan'],
-  ['list', '🛒', 'List'],
-  ['staples', '🧺', 'Staples'],
-  ['cart', '🤖', 'Cart'],
-  ['catalog', '📦', 'Catalog'],
-  ['whatsapp', '💬', 'Chat'],
-  ['settings', '⚙️', 'Settings'],
+  ['dashboard', '🏠', 'Home', 'Tuis'],
+  ['plan', '🍽️', 'Plan', 'Beplan'],
+  ['list', '🛒', 'List', 'Lys'],
+  ['staples', '🧺', 'Staples', 'Stapels'],
+  ['cart', '🤖', 'Cart', 'Mandjie'],
+  ['catalog', '📦', 'Catalog', 'Katalogus'],
+  ['whatsapp', '💬', 'Chat', 'Klets'],
+  ['settings', '⚙️', 'Settings', 'Instellings'],
 ];
 
-function greeting() {
+function greeting(tr) {
   const h = new Date().getHours();
-  if (h < 5) return 'Up late';
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 5) return tr('Up late', 'Laat op');
+  if (h < 12) return tr('Good morning', 'Goeiemôre');
+  if (h < 17) return tr('Good afternoon', 'Goeiemiddag');
+  return tr('Good evening', 'Goeienaand');
 }
 
 export default function App() {
   const [tab, setTab] = useState('dashboard');
   const [health, setHealth] = useState(null);
+  const { lang, setLang, tr } = useLang();
 
   useEffect(() => {
     api.get('/health').then(setHealth).catch(() => setHealth({ ok: false }));
@@ -40,22 +43,26 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div>
-          <h1>{greeting()}, Strauss family 🧑‍🍳</h1>
-          <div className="sub">What's cooking this week?</div>
+          <h1>{greeting(tr)}, {tr('Strauss family', 'Strauss-gesin')} 🧑‍🍳</h1>
+          <div className="sub">{tr("What's cooking this week?", 'Wat kook ons hierdie week?')}</div>
         </div>
-        {health && (
-          <div className="badges">
-            <span className={`badge ${health.ok ? 'ok' : 'err'}`}>{health.ok ? '● online' : '● offline'}</span>
-            <span className={`badge ${health.ai ? 'ok' : 'warn'}`}>AI {health.ai ? 'on' : 'off'}</span>
-            <span className={`badge ${health.whatsapp ? 'ok' : 'warn'}`}>{health.whatsapp ? 'WhatsApp live' : 'WA sim'}</span>
+        <div className="badges">
+          <div className="lang-toggle" role="group" aria-label="Language">
+            <button className={lang === 'en' ? 'active' : ''} onClick={() => setLang('en')}>EN</button>
+            <button className={lang === 'af' ? 'active' : ''} onClick={() => setLang('af')}>AF</button>
           </div>
-        )}
+          {health && (<>
+            <span className={`badge ${health.ok ? 'ok' : 'err'}`}>{health.ok ? tr('● online', '● aanlyn') : tr('● offline', '● vanlyn')}</span>
+            <span className={`badge ${health.ai ? 'ok' : 'warn'}`}>AI {health.ai ? tr('on', 'aan') : tr('off', 'af')}</span>
+            <span className={`badge ${health.whatsapp ? 'ok' : 'warn'}`}>{health.whatsapp ? tr('WhatsApp live', 'WhatsApp lewendig') : tr('WA sim', 'WA sim')}</span>
+          </>)}
+        </div>
       </header>
       <nav className="tabs">
-        {TABS.map(([id, ico, label]) => (
+        {TABS.map(([id, ico, en, af]) => (
           <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
             <span className="ico">{ico}</span>
-            <span>{label}</span>
+            <span>{tr(en, af)}</span>
           </button>
         ))}
       </nav>

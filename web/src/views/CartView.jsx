@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { useLang } from '../i18n.jsx';
 
 const STATUS_ICON = { added: '✅', substituted: '🔁', needs_review: '⚠️', unavailable: '🚫', error: '❌' };
 
 export default function CartView() {
+  const { tr } = useLang();
   const [runs, setRuns] = useState([]);
   const [run, setRun] = useState(null);
   const [manual, setManual] = useState(null);
@@ -41,7 +43,10 @@ export default function CartView() {
 
   async function complete(id) {
     const res = await api.post(`/cart/runs/${id}/complete`, {});
-    alert(`${res.purchased} items marked purchased and added to history. 🛵`);
+    alert(tr(
+      `${res.purchased} items marked purchased and added to history. 🛵`,
+      `${res.purchased} items as gekoop gemerk en by geskiedenis gevoeg. 🛵`,
+    ));
     setRun(null); loadRuns();
   }
 
@@ -50,7 +55,10 @@ export default function CartView() {
   }
 
   async function clearRuns() {
-    if (!confirm('Clear the cart run history? This removes the log of past robot runs only — your purchase history and the learned catalog are untouched.')) return;
+    if (!confirm(tr(
+      'Clear the cart run history? This removes the log of past robot runs only — your purchase history and the learned catalog are untouched.',
+      'Maak die mandjie-lopiegeskiedenis skoon? Dit verwyder net die log van vorige robotlopies — jou aankoopgeskiedenis en die aangeleerde katalogus bly onaangeraak.',
+    ))) return;
     setErr(null);
     try { await api.del('/cart/runs'); setRun(null); loadRuns(); }
     catch (e) { setErr(e.message); }
@@ -64,40 +72,48 @@ export default function CartView() {
   return (
     <div>
       <div className="card">
-        <h2>Sixty60 cart builder 🤖</h2>
+        <h2>{tr('Sixty60 cart builder 🤖', 'Sixty60-mandjiebouer 🤖')}</h2>
         <p className="lead">
-          The robot fills your Checkers trolley from the list: products it knows are added directly,
-          new items are searched and AI-matched, anything uncertain is flagged for you.
-          <b> It never checks out — you always review and pay.</b>
+          {tr(
+            'The robot fills your Checkers trolley from the list: products it knows are added directly, new items are searched and AI-matched, anything uncertain is flagged for you.',
+            'Die robot vul jou Checkers-trollie vanaf die lys: produkte wat dit ken word direk bygevoeg, nuwe items word gesoek en met KI gepas, enigiets onseker word vir jou gemerk.',
+          )}
+          <b> {tr('It never checks out — you always review and pay.', 'Dit betaal nooit self af nie — jy hersien en betaal altyd.')}</b>
         </p>
         <p className="muted">
-          The robot runs on the <b>home PC</b> (it needs a real browser). Tap <b>Build cart</b> below
+          {tr(<>The robot runs on the <b>home PC</b> (it needs a real browser). Tap <b>Build cart</b> below
           and — as long as the PC is on with the watcher running — it fills your Checkers trolley,
-          then WhatsApps you when it's ready.
+          then WhatsApps you when it's ready.</>,
+          <>Die robot loop op die <b>tuis-rekenaar</b> (dit het 'n regte webblaaier nodig). Tik <b>Bou mandjie</b> hieronder
+          en — solank die rekenaar aan is en die waghouer loop — vul dit jou Checkers-trollie,
+          en WhatsApp jou dan wanneer dit gereed is.</>)}
         </p>
         <p className="muted">
-          ⚠️ <b>Check out on the Checkers <i>website</i></b> (checkers.co.za, logged in) — in the
+          ⚠️ {tr(<><b>Check out on the Checkers <i>website</i></b> (checkers.co.za, logged in) — in the
           browser the robot leaves open, or in your phone's browser. The Sixty60 <i>mobile app</i>
-          keeps a <b>separate basket</b>, so the robot's order won't show there.
+          keeps a <b>separate basket</b>, so the robot's order won't show there.</>,
+          <><b>Betaal af op die Checkers-<i>webwerf</i></b> (checkers.co.za, ingeteken) — in die
+          webblaaier wat die robot oop los, of in jou foon se webblaaier. Die Sixty60-<i>selfoon-app</i>
+          hou 'n <b>aparte mandjie</b>, so die robot se bestelling sal nie daar wys nie.</>)}
         </p>
         <div className="row" style={{ marginTop: 4 }}>
-          <button className="primary" onClick={requestBuild}>🛒 Build cart now</button>
-          <button className="ghost" onClick={showManual}>📋 Manual mode (tap-through links)</button>
+          <button className="primary" onClick={requestBuild}>{tr('🛒 Build cart now', '🛒 Bou mandjie nou')}</button>
+          <button className="ghost" onClick={showManual}>{tr('📋 Manual mode (tap-through links)', '📋 Handmatige modus (tik-deur skakels)')}</button>
         </div>
-        {requested && <p className="muted" style={{ marginTop: 8 }}>✅ Requested — your home PC will fill the trolley shortly (it must be on). Watch the run appear below; you'll get a WhatsApp when it's ready.</p>}
+        {requested && <p className="muted" style={{ marginTop: 8 }}>{tr('✅ Requested — your home PC will fill the trolley shortly (it must be on). Watch the run appear below; you\'ll get a WhatsApp when it\'s ready.', '✅ Aangevra — jou tuis-rekenaar sal die trollie binnekort vul (dit moet aan wees). Kyk hoe die lopie hieronder verskyn; jy sal \'n WhatsApp kry wanneer dit gereed is.')}</p>}
         {err && <div className="error-box">{err}</div>}
       </div>
 
       {manual && (
         <div className="card">
-          <h2>Manual mode — {manual.length} items</h2>
-          <p className="muted">Each link opens a Checkers search. Tap, add, next. Unbreakable fallback.</p>
+          <h2>{tr('Manual mode', 'Handmatige modus')} — {manual.length} {tr('items', 'items')}</h2>
+          <p className="muted">{tr('Each link opens a Checkers search. Tap, add, next. Unbreakable fallback.', 'Elke skakel maak \'n Checkers-soektog oop. Tik, voeg by, volgende. Onbreekbare terugval.')}</p>
           <ul className="items">
             {manual.map(m => (
               <li key={m.id}>
                 <span className="name">{m.name}</span>
                 <span className="qty">{Number(m.quantity)}{m.unit ? ` ${m.unit}` : '×'}</span>
-                <a href={m.link} target="_blank" rel="noreferrer">Open search ↗</a>
+                <a href={m.link} target="_blank" rel="noreferrer">{tr('Open search ↗', 'Maak soektog oop ↗')}</a>
               </li>
             ))}
           </ul>
@@ -106,13 +122,13 @@ export default function CartView() {
 
       <div className="card">
         <div className="row">
-          <h2>Runs</h2>
+          <h2>{tr('Runs', 'Lopies')}</h2>
           <div className="spacer" />
-          {runs.length > 0 && <button className="ghost tiny" onClick={clearRuns}>🗑 Clear history</button>}
+          {runs.length > 0 && <button className="ghost tiny" onClick={clearRuns}>{tr('🗑 Clear history', '🗑 Maak geskiedenis skoon')}</button>}
         </div>
-        {!runs.length && <p className="muted">No cart runs yet.</p>}
+        {!runs.length && <p className="muted">{tr('No cart runs yet.', 'Nog geen mandjie-lopies nie.')}</p>}
         <table className="plain">
-          <thead><tr><th>#</th><th>Started</th><th>Status</th><th>Added</th><th>Review</th><th>Est. total</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>{tr('Started', 'Begin')}</th><th>{tr('Status', 'Status')}</th><th>{tr('Added', 'Bygevoeg')}</th><th>{tr('Review', 'Hersien')}</th><th>{tr('Est. total', 'Gesk. totaal')}</th><th></th></tr></thead>
           <tbody>
             {runs.map(r => {
               const s = summary(r);
@@ -120,11 +136,11 @@ export default function CartView() {
                 <tr key={r.id}>
                   <td>{r.id}</td>
                   <td>{new Date(r.started_at).toLocaleString('en-ZA')}</td>
-                  <td>{r.status === 'running' ? '⏳ filling…' : r.status === 'requested' ? '🕒 waiting for PC' : r.status}</td>
+                  <td>{r.status === 'running' ? tr('⏳ filling…', '⏳ vul…') : r.status === 'requested' ? tr('🕒 waiting for PC', '🕒 wag vir rekenaar') : r.status}</td>
                   <td>{s.added ?? '—'}</td>
                   <td>{s.needs_review ?? '—'}</td>
                   <td>{s.est_total_cents ? `R${(s.est_total_cents / 100).toFixed(2)}` : '—'}</td>
-                  <td><button className="ghost tiny" onClick={() => openRun(r.id)}>Details</button></td>
+                  <td><button className="ghost tiny" onClick={() => openRun(r.id)}>{tr('Details', 'Besonderhede')}</button></td>
                 </tr>
               );
             })}
@@ -135,19 +151,22 @@ export default function CartView() {
       {run && (
         <div className="card">
           <div className="row">
-            <h2>Run #{run.id} — review &amp; confirm</h2>
+            <h2>{tr('Run', 'Lopie')} #{run.id} — {tr('review & confirm', 'hersien & bevestig')}</h2>
             <div className="spacer" />
             {run.status === 'done' && (
-              <button className="primary" onClick={() => complete(run.id)}>✅ I checked out — confirm purchases</button>
+              <button className="primary" onClick={() => complete(run.id)}>{tr('✅ I checked out — confirm purchases', '✅ Ek het afbetaal — bevestig aankope')}</button>
             )}
           </div>
           <p className="muted">
-            Changed a brand or quantity at checkout? <b>Fix it here</b>, then tap <b>I checked out</b> —
+            {tr(<>Changed a brand or quantity at checkout? <b>Fix it here</b>, then tap <b>I checked out</b> —
             the bot remembers your corrections and buys exactly these next time. Untick <b>Bought</b> for
-            anything you removed.
+            anything you removed.</>,
+            <>'n Handelsmerk of hoeveelheid by die betaalpunt verander? <b>Maak dit hier reg</b>, tik dan <b>Ek het afbetaal</b> —
+            die bot onthou jou regstellings en koop volgende keer presies hierdie. Ontmerk <b>Gekoop</b> vir
+            enigiets wat jy verwyder het.</>)}
           </p>
           <table className="plain">
-            <thead><tr><th></th><th>Item</th><th>Product you bought</th><th>Qty</th><th>Price (R)</th><th>Bought</th></tr></thead>
+            <thead><tr><th></th><th>{tr('Item', 'Item')}</th><th>{tr('Product you bought', 'Produk wat jy gekoop het')}</th><th>{tr('Qty', 'Hoev.')}</th><th>{tr('Price (R)', 'Prys (R)')}</th><th>{tr('Bought', 'Gekoop')}</th></tr></thead>
             <tbody>
               {run.items.map(it => {
                 const editable = it.status === 'added' || it.status === 'substituted';
@@ -160,7 +179,7 @@ export default function CartView() {
                       <input type="text" defaultValue={it.product_name || ''} style={{ minWidth: 200 }}
                         onBlur={e => e.target.value !== (it.product_name || '') && patchItem(it, { product_name: e.target.value })} />
                     ) : (
-                      <span className="muted">{it.note || '—'} {it.product_url && <a href={it.product_url} target="_blank" rel="noreferrer">search ↗</a>}</span>
+                      <span className="muted">{it.note || '—'} {it.product_url && <a href={it.product_url} target="_blank" rel="noreferrer">{tr('search ↗', 'soek ↗')}</a>}</span>
                     )}
                   </td>
                   <td>{editable ? (

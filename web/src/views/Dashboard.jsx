@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { api, todayISO } from '../api.js';
 import { foodArt, dayShort } from '../foodArt.js';
 import TodoList from './TodoList.jsx';
+import { useLang } from '../i18n.jsx';
 
 const isoDate = v => String(v).slice(0, 10);
 
 export default function Dashboard({ goTo }) {
+  const { tr, locale } = useLang();
   const [data, setData] = useState(null);
   const [plan, setPlan] = useState(null);
   const [items, setItems] = useState([]);
@@ -20,7 +22,7 @@ export default function Dashboard({ goTo }) {
   }, []);
 
   if (err) return <div className="error-box">{err}</div>;
-  if (!data) return <p className="muted">Setting the table…</p>;
+  if (!data) return <p className="muted">{tr('Setting the table…', 'Ons dek die tafel…')}</p>;
 
   const meals = plan?.meals || []; // server returns these in date order
   const isToday = m => m.meal_date && isoDate(m.meal_date) === todayISO();
@@ -47,7 +49,7 @@ export default function Dashboard({ goTo }) {
       {selected ? (
         <div className="hero">
           <div className="hero-art" style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
-            <span className="kicker">{isToday(selected) ? "Tonight's dinner" : `${selected.day_of_week}'s dinner`}</span>
+            <span className="kicker">{isToday(selected) ? tr("Tonight's dinner", 'Vanaand se aandete') : tr(`${selected.day_of_week}'s dinner`, `${selected.day_of_week} se aandete`)}</span>
             <span className="emoji">{art.emoji}</span>
           </div>
           <div className="hero-body">
@@ -59,14 +61,14 @@ export default function Dashboard({ goTo }) {
               {selected.cuisine && <span className="tag gold">{selected.cuisine}</span>}
               <div className="spacer" />
               <button className="ghost" onClick={() => setShowRecipe(v => !v)}>
-                {showRecipe ? 'Hide recipe ▲' : 'See the recipe →'}
+                {showRecipe ? tr('Hide recipe ▲', 'Versteek resep ▲') : tr('See the recipe →', 'Sien die resep →')}
               </button>
             </div>
             {showRecipe && (
               <div className="recipe-expand" style={{ marginTop: 12 }}>
                 {selected.ingredients?.length > 0 && (
                   <>
-                    <h4 style={{ margin: '0 0 6px' }}>Ingredients</h4>
+                    <h4 style={{ margin: '0 0 6px' }}>{tr('Ingredients', 'Bestanddele')}</h4>
                     <ul className="muted" style={{ paddingLeft: 18, margin: '0 0 12px' }}>
                       {selected.ingredients.map((ing, i) => (
                         <li key={i}>{Number(ing.quantity)} {ing.unit || ''} {ing.name}</li>
@@ -76,12 +78,12 @@ export default function Dashboard({ goTo }) {
                 )}
                 {selected.instructions && (
                   <>
-                    <h4 style={{ margin: '0 0 6px' }}>Method</h4>
+                    <h4 style={{ margin: '0 0 6px' }}>{tr('Method', 'Metode')}</h4>
                     <p className="muted" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{selected.instructions}</p>
                   </>
                 )}
                 {!selected.ingredients?.length && !selected.instructions && (
-                  <p className="muted" style={{ margin: 0 }}>No recipe details for this one — it's a no-cook / leftovers night.</p>
+                  <p className="muted" style={{ margin: 0 }}>{tr("No recipe details for this one — it's a no-cook / leftovers night.", 'Geen reseptebesonderhede hiervoor nie — dis ’n nie-kook / oorskietkos-aand.')}</p>
                 )}
               </div>
             )}
@@ -93,9 +95,9 @@ export default function Dashboard({ goTo }) {
             <span className="emoji">🧑‍🍳</span>
           </div>
           <div className="hero-body">
-            <h2>No plan for this week yet</h2>
-            <p>Two minutes with the weekly wizard and dinner is sorted — budget, busy nights, braai and all.</p>
-            <button className="primary terra" onClick={() => goTo('plan')}>Plan this week's dinners</button>
+            <h2>{tr('No plan for this week yet', 'Nog geen plan vir hierdie week nie')}</h2>
+            <p>{tr('Two minutes with the weekly wizard and dinner is sorted — budget, busy nights, braai and all.', 'Twee minute met die weeklikse towenaar en aandete is gereël — begroting, besige aande, braai en als.')}</p>
+            <button className="primary terra" onClick={() => goTo('plan')}>{tr("Plan this week's dinners", 'Beplan hierdie week se aandetes')}</button>
           </div>
         </div>
       )}
@@ -103,8 +105,8 @@ export default function Dashboard({ goTo }) {
       {/* Week at a glance — tap a day to show its meal in the card above */}
       {meals.length > 0 && (
         <div className="card">
-          <h2>The week at a glance</h2>
-          <p className="muted" style={{ margin: '0 0 6px' }}>Tap a day to see its dinner above.</p>
+          <h2>{tr('The week at a glance', 'Die week in een oogopslag')}</h2>
+          <p className="muted" style={{ margin: '0 0 6px' }}>{tr('Tap a day to see its dinner above.', 'Tik op ’n dag om sy aandete hierbo te sien.')}</p>
           <div className="week-strip" style={{ marginTop: 10 }}>
             {meals.map(m => {
               const a = foodArt(m);
@@ -127,41 +129,41 @@ export default function Dashboard({ goTo }) {
       {/* Insight tiles */}
       <div className="grid cols3">
         <div className="tile">
-          <div className="t-label">💰 Budget</div>
+          <div className="t-label">{tr('💰 Budget', '💰 Begroting')}</div>
           {budget ? (
             <>
-              <div className="t-value">R{plannedRand} <span style={{ fontSize: '0.95rem', color: 'var(--muted)' }}>of R{budget}</span></div>
-              <div className="t-sub">{plannedRand <= budget ? `R${budget - plannedRand} breathing room` : `R${plannedRand - budget} over — swap a meal cheaper`}</div>
+              <div className="t-value">R{plannedRand} <span style={{ fontSize: '0.95rem', color: 'var(--muted)' }}>{tr(`of R${budget}`, `van R${budget}`)}</span></div>
+              <div className="t-sub">{plannedRand <= budget ? tr(`R${budget - plannedRand} breathing room`, `R${budget - plannedRand} spasie oor`) : tr(`R${plannedRand - budget} over — swap a meal cheaper`, `R${plannedRand - budget} oor — ruil ’n maaltyd goedkoper`)}</div>
               <div className="progress terra"><div style={{ width: `${Math.min(100, Math.round((plannedRand / budget) * 100))}%` }} /></div>
             </>
           ) : (
             <>
               <div className="t-value">—</div>
-              <div className="t-sub">Set a budget in the weekly wizard</div>
+              <div className="t-sub">{tr('Set a budget in the weekly wizard', 'Stel ’n begroting in die weeklikse towenaar')}</div>
             </>
           )}
         </div>
         <div className="tile">
-          <div className="t-label">🛒 Shopping</div>
-          <div className="t-value">{pending} <span style={{ fontSize: '0.95rem', color: 'var(--muted)' }}>to buy</span></div>
-          <div className="t-sub">{inCart ? `${inCart} in the trolley · ` : ''}{done ? `${done} bought` : 'list fills via WhatsApp + the plan'}</div>
+          <div className="t-label">{tr('🛒 Shopping', '🛒 Inkopies')}</div>
+          <div className="t-value">{pending} <span style={{ fontSize: '0.95rem', color: 'var(--muted)' }}>{tr('to buy', 'om te koop')}</span></div>
+          <div className="t-sub">{inCart ? tr(`${inCart} in the trolley · `, `${inCart} in die trollie · `) : ''}{done ? tr(`${done} bought`, `${done} gekoop`) : tr('list fills via WhatsApp + the plan', 'lys vul via WhatsApp + die plan')}</div>
           <div className="progress"><div style={{ width: `${shopPct}%` }} /></div>
         </div>
         <div className="tile">
-          <div className="t-label">🧠 Pantry memory</div>
+          <div className="t-label">{tr('🧠 Pantry memory', '🧠 Spens-geheue')}</div>
           <div className="t-value">{data.catalog_confirmed}<span style={{ fontSize: '0.95rem', color: 'var(--muted)' }}>/{data.catalog_size}</span></div>
-          <div className="t-sub">products it knows by heart</div>
+          <div className="t-sub">{tr('products it knows by heart', 'produkte wat dit uit die kop ken')}</div>
           <div className="progress"><div style={{ width: `${data.catalog_size ? Math.round((data.catalog_confirmed / data.catalog_size) * 100) : 0}%` }} /></div>
         </div>
       </div>
 
       {/* How it flows */}
       <div className="card" style={{ marginTop: 16 }}>
-        <h2>How the kitchen runs 🍳</h2>
+        <h2>{tr('How the kitchen runs 🍳', 'Hoe die kombuis werk 🍳')}</h2>
         <ol className="muted" style={{ lineHeight: 2.1, margin: '6px 0 0', paddingLeft: 20 }}>
-          <li>Out of something? The family tells <b>Groceries Bot</b> on WhatsApp — it lands on the <a onClick={() => goTo('list')} href="#">list</a> by itself.</li>
-          <li>Weekend: <a onClick={() => goTo('plan')} href="#">plan the week's dinners</a> and send the ingredients across.</li>
-          <li>Shop day: <a onClick={() => goTo('cart')} href="#">the robot packs the Sixty60 trolley</a> — you check it and press Pay.</li>
+          <li>{tr('Out of something? The family tells ', 'Iets op? Die gesin sê vir ')}<b>Groceries Bot</b>{tr(' on WhatsApp — it lands on the ', ' op WhatsApp — dit beland vanself op die ')}<a onClick={() => goTo('list')} href="#">{tr('list', 'lys')}</a>{tr(' by itself.', '.')}</li>
+          <li>{tr('Weekend: ', 'Naweek: ')}<a onClick={() => goTo('plan')} href="#">{tr("plan the week's dinners", 'beplan die week se aandetes')}</a>{tr(' and send the ingredients across.', ' en stuur die bestanddele deur.')}</li>
+          <li>{tr('Shop day: ', 'Inkopiedag: ')}<a onClick={() => goTo('cart')} href="#">{tr('the robot packs the Sixty60 trolley', 'die robot pak die Sixty60-trollie')}</a>{tr(' — you check it and press Pay.', ' — jy gaan dit na en druk Betaal.')}</li>
         </ol>
       </div>
     </div>
