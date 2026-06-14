@@ -231,21 +231,21 @@ ul.items input[type="checkbox"] { width: 19px; height: 19px; accent-color: var(-
 .hero-body h2 { margin: 0 0 4px; font-size: 1.45rem; font-weight: 600; }
 .hero-body p { margin: 0 0 10px; color: var(--muted); font-size: 0.9rem; }
 
-/* Flex row capped at a 7-up block width: 7 days fill the row, while a short
-   3-day plan keeps the same block size and sits centred instead of cramped left. */
+/* Wrapping flex row: blocks are wide enough to show the full meal title (wrapping
+   to several lines), and wrap onto more rows on narrow screens. A short 3-day
+   plan stays centred and capped so it doesn't stretch too wide. */
 .week-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .week-strip .wday {
-  flex: 1 1 0; min-width: 0; /* allow the block to shrink below content width */
-  max-width: calc((100% - 48px) / 7); /* never wider than one of seven columns */
+  flex: 1 1 120px; min-width: 116px; /* wide enough for the full title */
+  max-width: 200px; /* keep short plans from stretching too wide */
   background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm);
-  padding: 10px 4px; text-align: center; cursor: pointer; transition: all 0.12s ease;
+  padding: 10px 8px; text-align: center; cursor: pointer; transition: all 0.12s ease;
 }
 .week-strip .wday:hover { transform: translateY(-2px); box-shadow: var(--shadow-soft); }
 .week-strip .wday.today { border-color: var(--marigold); background: var(--gold-soft); }
 .week-strip .d { font-size: 0.64rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .week-strip .e { font-size: 1.35rem; margin: 2px 0; }
-.week-strip .t { font-size: 0.62rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-@media (max-width: 640px) { .week-strip .t { display: none; } }
+.week-strip .t { font-size: 0.66rem; color: var(--muted); line-height: 1.25; }
 
 /* Per-serving nutrition strip on recipe cards / the dinner hero. */
 .nutrition { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 4px 0 12px; }
