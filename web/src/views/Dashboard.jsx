@@ -121,6 +121,9 @@ export default function Dashboard({ goTo }) {
         </div>
       )}
 
+      {/* Family to-do list */}
+      <TodoList />
+
       {/* Insight tiles */}
       <div className="grid cols3">
         <div className="tile">
@@ -161,9 +164,6 @@ export default function Dashboard({ goTo }) {
           <li>Shop day: <a onClick={() => goTo('cart')} href="#">the robot packs the Sixty60 trolley</a> — you check it and press Pay.</li>
         </ol>
       </div>
-
-      {/* Family to-do list */}
-      <TodoList />
     </div>
   );
 }
