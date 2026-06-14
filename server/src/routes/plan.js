@@ -2,6 +2,7 @@ import express from 'express';
 import { query } from '../db/db.js';
 import { generatePlan, swapMeal } from '../services/planner.js';
 import { consolidate, normalizeName, shoppableQuantity } from '../services/consolidate.js';
+import { ensureAfTranslations, planDisplayStrings } from '../services/translateService.js';
 
 const router = express.Router();
 
@@ -193,6 +194,9 @@ router.post('/generate', async (req, res, next) => {
       try {
         const generated = await generatePlan(context);
         const planId = await persistGeneratedPlan(week_start, context, generated, { days: horizon });
+        // Pre-warm Afrikaans translations so the plan shows in AF immediately,
+        // with no English-then-Afrikaans flip after it loads.
+        if (language === 'af') await ensureAfTranslations(planDisplayStrings(generated)).catch(() => {});
         await query(`UPDATE meal_plans SET status = 'active' WHERE id = $1`, [planId]);
         console.log(`plan generated for ${week_start}`);
       } catch (err) {
@@ -261,6 +265,8 @@ router.post('/:weekStart/swap', async (req, res, next) => {
       try {
         const generated = await swapMeal(ctx, current, day, reason);
         await persistGeneratedPlan(weekStart, ctx, generated, { replaceDay: day, existingPlanId: plan.id, days: plan.horizon_days || 7 });
+        // Pre-warm AF translations for the new meal before the plan flips to ready.
+        if (ctx?.language === 'af') await ensureAfTranslations(planDisplayStrings(generated)).catch(() => {});
         await query(`UPDATE meal_plans SET status = 'active' WHERE id = $1`, [plan.id]);
         console.log(`swapped ${day} for ${weekStart}`);
       } catch (err) {
