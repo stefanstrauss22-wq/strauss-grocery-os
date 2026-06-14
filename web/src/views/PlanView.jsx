@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, todayISO, addDays, planWindow } from '../api.js';
 import { foodArt } from '../foodArt.js';
+import Nutrition from '../components/Nutrition.jsx';
 import { useLang, useAutoTranslate, ingredientEnglish } from '../i18n.jsx';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -225,10 +226,12 @@ export default function PlanView() {
                   <span>⏱ {(meal.prep_minutes || 0) + (meal.cook_minutes || 0)} min</span>
                   <span>💰 ~R{Math.round((meal.est_cost_cents || 0) / 100)}</span>
                   <span>🍽 {meal.servings}</span>
+                  {meal.calories_kcal != null && <span>🔥 {meal.calories_kcal} kcal</span>}
                 </div>
                 {meal.ingredients?.length > 0 && (
                   <details>
                     <summary>{tr('Recipe & ingredients', 'Resep & bestanddele')}</summary>
+                    <Nutrition recipe={meal} />
                     <ul className="muted" style={{ paddingLeft: 18 }}>
                       {meal.ingredients.map((ing, i) => (
                         <li key={i}>{tx(ingredientEnglish(ing))}</li>

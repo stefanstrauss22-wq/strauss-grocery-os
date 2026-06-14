@@ -231,6 +231,11 @@ ul.items input[type="checkbox"] { width: 19px; height: 19px; accent-color: var(-
 .week-strip .t { font-size: 0.62rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 @media (max-width: 640px) { .week-strip .t { display: none; } }
 
+/* Per-serving nutrition strip on recipe cards / the dinner hero. */
+.nutrition { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 4px 0 12px; }
+.nutrition .nut-label { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.nutrition .nut { font-size: 0.78rem; color: var(--ink); background: var(--cream-2); border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+
 .tile { background: var(--card); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow-soft); border: 1px solid rgba(237, 228, 212, 0.7); }
 .tile .t-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .tile .t-value { font-family: var(--font-display); font-size: 1.6rem; font-weight: 600; margin: 4px 0 2px; color: var(--ink); }

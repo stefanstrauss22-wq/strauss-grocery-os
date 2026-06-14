@@ -93,11 +93,13 @@ async function persistGeneratedPlan(weekStart, context, generated, { replaceDay 
     );
     if (entryRow.rows.length && entryRow.rows[0].locked && !replaceDay) continue;
 
+    const n = meal.nutrition || {};
     const { rows: recipeRows } = await query(
-      `INSERT INTO recipes (title, description, cuisine, instructions, prep_minutes, cook_minutes, servings, tags, est_cost_cents)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+      `INSERT INTO recipes (title, description, cuisine, instructions, prep_minutes, cook_minutes, servings, tags, est_cost_cents, calories_kcal, protein_g, carbs_g, fat_g, fibre_g)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
       [meal.title, meal.description, meal.cuisine, meal.instructions, meal.prep_minutes,
-       meal.cook_minutes, meal.servings, JSON.stringify(meal.tags || []), (meal.est_cost_rand || 0) * 100]
+       meal.cook_minutes, meal.servings, JSON.stringify(meal.tags || []), (meal.est_cost_rand || 0) * 100,
+       n.calories_kcal ?? null, n.protein_g ?? null, n.carbs_g ?? null, n.fat_g ?? null, n.fibre_g ?? null]
     );
     const recipeId = recipeRows[0].id;
     for (const ing of meal.ingredients || []) {
@@ -243,6 +245,10 @@ router.post('/:weekStart/swap', async (req, res, next) => {
         day: m.day_of_week, title: m.title, description: m.description, cuisine: m.cuisine,
         prep_minutes: m.prep_minutes, cook_minutes: m.cook_minutes, servings: m.servings,
         tags: m.tags, est_cost_rand: Math.round((m.est_cost_cents || 0) / 100),
+        nutrition: {
+          calories_kcal: m.calories_kcal, protein_g: m.protein_g,
+          carbs_g: m.carbs_g, fat_g: m.fat_g, fibre_g: m.fibre_g,
+        },
         instructions: m.instructions, ingredients: m.ingredients,
       })),
     };

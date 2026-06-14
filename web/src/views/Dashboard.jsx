@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, todayISO } from '../api.js';
 import { foodArt } from '../foodArt.js';
+import Nutrition from '../components/Nutrition.jsx';
 import TodoList from './TodoList.jsx';
 import { useLang, useAutoTranslate, ingredientEnglish } from '../i18n.jsx';
 
@@ -62,6 +63,7 @@ export default function Dashboard({ goTo }) {
             <div className="row">
               <span className="tag">⏱ {(selected.prep_minutes || 0) + (selected.cook_minutes || 0)} min</span>
               <span className="tag terra">💰 ~R{Math.round((selected.est_cost_cents || 0) / 100)}</span>
+              {selected.calories_kcal != null && <span className="tag">🔥 {selected.calories_kcal} kcal</span>}
               {selected.cuisine && <span className="tag gold">{selected.cuisine}</span>}
               <div className="spacer" />
               <button className="ghost" onClick={() => setShowRecipe(v => !v)}>
@@ -70,6 +72,7 @@ export default function Dashboard({ goTo }) {
             </div>
             {showRecipe && (
               <div className="recipe-expand" style={{ marginTop: 12 }}>
+                <Nutrition recipe={selected} />
                 {selected.ingredients?.length > 0 && (
                   <>
                     <h4 style={{ margin: '0 0 6px' }}>{tr('Ingredients', 'Bestanddele')}</h4>

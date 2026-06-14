@@ -20,6 +20,19 @@ const PLAN_SCHEMA = {
           servings: { type: 'integer' },
           tags: { type: 'array', items: { type: 'string' } },
           est_cost_rand: { type: 'integer', description: 'Estimated ingredient cost in South African Rand for the whole meal' },
+          nutrition: {
+            type: 'object',
+            description: 'Approximate nutrition PER SERVING (one plate, not the whole pot). Honest estimates for a typical portion at the stated servings.',
+            properties: {
+              calories_kcal: { type: 'integer', description: 'kilocalories per serving' },
+              protein_g: { type: 'integer', description: 'grams of protein per serving' },
+              carbs_g: { type: 'integer', description: 'grams of carbohydrate per serving' },
+              fat_g: { type: 'integer', description: 'grams of fat per serving' },
+              fibre_g: { type: 'integer', description: 'grams of fibre per serving' }
+            },
+            required: ['calories_kcal', 'protein_g', 'carbs_g', 'fat_g', 'fibre_g'],
+            additionalProperties: false
+          },
           instructions: { type: 'string', description: 'Numbered cooking steps, concise' },
           ingredients: {
             type: 'array',
@@ -36,7 +49,7 @@ const PLAN_SCHEMA = {
             }
           }
         },
-        required: ['day', 'title', 'description', 'cuisine', 'prep_minutes', 'cook_minutes', 'servings', 'tags', 'est_cost_rand', 'instructions', 'ingredients'],
+        required: ['day', 'title', 'description', 'cuisine', 'prep_minutes', 'cook_minutes', 'servings', 'tags', 'est_cost_rand', 'nutrition', 'instructions', 'ingredients'],
         additionalProperties: false
       }
     },
@@ -62,6 +75,7 @@ Principles:
 - Honour the mood chips exactly (cheaper week, one-pot, use up the freezer, old favourites vs try-something-new, kid-friendly, no spicy food).
 - Avoid the listed dislikes and allergies absolutely.
 - Ingredients must be shoppable: name them the way a supermarket product is named, with realistic pack-relevant quantities. Exclude pantry staples the family always has (salt, pepper, cooking oil) unless the recipe needs an unusual amount.
+- Give honest per-serving nutrition (calories, protein, carbs, fat, fibre) for a single plated portion at the stated servings — not the whole pot. For a no-cook / "off" night with no real meal, use small or zero values.
 - If some days are already locked, those meals are fixed: do NOT plan or duplicate them — only fill the open days, and avoid repeating the locked meals.
 - The weekend / Sunday is the big family meal unless told otherwise.`;
 
