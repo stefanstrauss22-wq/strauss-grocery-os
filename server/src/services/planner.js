@@ -82,12 +82,12 @@ Principles:
 // Recipes are ALWAYS authored and stored in English (canonical). Afrikaans is
 // produced at display time by the /api/translate layer and cached, so both
 // languages stay consistent and Sixty60 always has English ingredient names.
-// Generating prose directly in Afrikaans is intentionally NOT done: it would be
-// fed back through the English→Afrikaans display translator and round-trip into
-// English. The `language` context field is kept for reference but no longer
-// changes how the plan is generated.
+// We must force English EXPLICITLY: the context (mood chips, the recent-meals
+// list) often arrives in Afrikaans, and the model otherwise mirrors that and
+// replies in Afrikaans — which would then round-trip back to English through
+// the display translator.
 function languageInstruction() {
-  return '';
+  return `\n\nLANGUAGE — IMPORTANT: Write ALL recipe text in ENGLISH — every "title", "description", "instructions", "tags", "cuisine" and "week_summary" — even though some context above (mood chips, recent meal names) may be in Afrikaans. Ingredient "name" fields must be lowercase English shoppable supermarket form (e.g. "chicken thighs", "basmati rice"). Do NOT output any Afrikaans; the app translates to Afrikaans for display on its own.`;
 }
 
 export async function generatePlan(context) {
