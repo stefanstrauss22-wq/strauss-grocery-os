@@ -8,7 +8,6 @@ import ListView from './views/ListView.jsx';
 import StaplesView from './views/StaplesView.jsx';
 import CartView from './views/CartView.jsx';
 import CatalogView from './views/CatalogView.jsx';
-import WhatsAppSim from './views/WhatsAppSim.jsx';
 import SettingsView from './views/SettingsView.jsx';
 
 // [id, icon, English label, Afrikaans label]
@@ -19,7 +18,6 @@ const TABS = [
   ['staples', '🧺', 'Staples', 'Stapels'],
   ['cart', '🤖', 'Cart', 'Mandjie'],
   ['catalog', '📦', 'Catalog', 'Katalogus'],
-  ['whatsapp', '💬', 'Chat', 'Klets'],
   ['settings', '⚙️', 'Settings', 'Instellings'],
 ];
 
@@ -69,7 +67,6 @@ export default function App() {
         {tab === 'staples' && <StaplesView />}
         {tab === 'cart' && <CartView />}
         {tab === 'catalog' && <CatalogView />}
-        {tab === 'whatsapp' && <WhatsAppSim />}
         {tab === 'settings' && <SettingsView />}
       </main>
     </div>
