@@ -86,9 +86,10 @@ router.post('/runs/:id/notify', async (req, res, next) => {
     if (!phone) return res.json({ notified: false, reason: 'no notify_phone configured' });
     const s = typeof run.summary === 'string' ? JSON.parse(run.summary) : (run.summary || {});
     const rand = s.est_total_cents ? `~R${(s.est_total_cents / 100).toFixed(0)}` : '';
+    const reason = s.error ? ` ${s.error}` : '';
     const msg = run.status === 'done'
       ? `🛒 Your Checkers cart is ready: ${s.added || 0} items${rand ? `, ${rand}` : ''}${s.needs_review ? `, ${s.needs_review} to check` : ''}. Open checkers.co.za (logged in, NOT the Sixty60 app) to review & pay.`
-      : `⚠️ The cart build hit a snag. Open the app → Cart tab for details.`;
+      : `⚠️ The cart build hit a snag.${reason} Open the app → Cart tab for details.`;
     await sendWhatsApp(phone, msg);
     res.json({ notified: true });
   } catch (e) { next(e); }

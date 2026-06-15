@@ -122,6 +122,30 @@ async function scrapeSearchResults(page, itemName, limit = 8) {
   return candidates;
 }
 
+// Verify the saved session is still valid BEFORE shopping. Sixty60 tokens are
+// short-lived (hours) and a logged-out build silently adds nothing — search
+// still renders, but "Add To Basket" never sticks — so the run used to finish
+// as "done, 0 added". We detect a logged-out storefront up front and fail loud.
+// Conservative: only report logged-out when we clearly see a sign-in affordance
+// and NO account link, so a valid session is never false-failed.
+async function isLoggedIn(page) {
+  try {
+    await page.goto('https://www.checkers.co.za/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(2500);
+    return await page.evaluate(() => {
+      const accountLink = !!document.querySelector('a[href*="/account"], a[href*="my-account"], a[href*="logout"], a[href*="sign-out"]');
+      if (accountLink) return true; // a profile/logout link only exists when signed in
+      const signIn = [...document.querySelectorAll('a,button')].some(el => {
+        const t = (el.textContent || '').trim().toLowerCase();
+        return t === 'sign in' || t === 'log in' || t === 'login' || t.startsWith('sign in') || t.startsWith('log in');
+      });
+      return !signIn; // sign-in prompt + no account link => logged out
+    });
+  } catch {
+    return true; // render/network hiccup — don't false-fail a possibly-valid session
+  }
+}
+
 // Best-effort read of the running cart total shown in the header (e.g. "R104.99").
 async function cartTotalCents(page) {
   try {
@@ -187,6 +211,11 @@ export async function buildCart(runId, { keepOpen = false } = {}) {
   let totalCents = 0;
 
   try {
+    // Stale-session guard: bail before shopping if the saved login has expired,
+    // rather than dutifully "adding" items to a guest cart that never persists.
+    if (!(await isLoggedIn(page))) {
+      throw new Error('Checkers session expired — run "Checkers Login" (npm run sixty60:login) on the home PC, then build again.');
+    }
     for (const item of items) {
       try {
         const match = await matchCatalog(item.name);
@@ -261,9 +290,15 @@ export async function buildCart(runId, { keepOpen = false } = {}) {
     // read is kept only as a secondary signal — it's easily fooled by other
     // "Rxx" text near the top, so we don't display it as the grand total.
     const headerRead = await cartTotalCents(page);
+    // Backstop: if there were items to buy but NONE went in, treat it as a
+    // failure (most often an expired login the up-front check didn't catch, or
+    // site-wide breakage) instead of reporting a misleading "done, 0 added".
+    const noneAdded = items.length > 0 && counts.added === 0;
+    const summary = { ...counts, total_items: items.length, est_total_cents: totalCents, header_total_cents: headerRead };
+    if (noneAdded) summary.error = `Added 0 of ${items.length} items — your Checkers login has likely expired. Run "Checkers Login", then build again.`;
     await query(
-      `UPDATE cart_runs SET status = 'done', finished_at = now(), summary = $1 WHERE id = $2`,
-      [JSON.stringify({ ...counts, total_items: items.length, est_total_cents: totalCents, header_total_cents: headerRead }), runId]);
+      `UPDATE cart_runs SET status = $3, finished_at = now(), summary = $1 WHERE id = $2`,
+      [JSON.stringify(summary), runId, noneAdded ? 'failed' : 'done']);
     console.log('cart run complete:', counts, 'est total:', `R${(totalCents / 100).toFixed(2)}`);
   } catch (err) {
     failed = true;
